@@ -1,0 +1,13 @@
+﻿node_modules
+.next
+out
+.firebase
+firebase-debug.log
+.env.local
+.env.development
+.env.production
+.env.test
+
+# OS junk
+.DS_Store
+Thumbs.db
