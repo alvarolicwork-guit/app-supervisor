@@ -5,10 +5,6 @@ const nextConfig: NextConfig = {
     // Fail builds when there are type errors so we catch issues early.
     ignoreBuildErrors: false,
   },
-  eslint: {
-    // Run ESLint during builds; adjust .eslintrc if false positives appear.
-    ignoreDuringBuilds: false,
-  },
   images: {
     remotePatterns: [
       {
