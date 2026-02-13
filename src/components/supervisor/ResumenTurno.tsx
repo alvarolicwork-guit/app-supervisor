@@ -25,6 +25,7 @@ export interface DatosUnidadRegistrada {
         mujeres: number;
         detencionDomiciliaria: number;
     };
+    jefeSeguridad?: string;
     novedadesTexto?: string;
 }
 

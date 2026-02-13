@@ -78,6 +78,9 @@ export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, 
         return now.toISOString().slice(0, 16);
     });
 
+    // --- Estado Jefe de Seguridad ---
+    const [jefeSeguridad, setJefeSeguridad] = useState('');
+
     // --- Estados de Personal ---
     const [cantPersonal, setCantPersonal] = useState(0);
     const [novPersonal, setNovPersonal] = useState<NovedadPersonal>('sin');
@@ -166,6 +169,7 @@ export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, 
             onSave({
                 unidad: nombreUnidad,
                 fechaHoraControl: fechaControl,
+                jefeSeguridad: jefeSeguridad.trim(),
                 personal: { cantidad: cantPersonal, estado: novPersonal, detalles: { faltantes, abandono, arrestados, permisos } },
                 poblacionPenal: {
                     total: pplVarones + pplMujeres,
@@ -181,6 +185,7 @@ export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, 
         onSave({
             unidad: nombreUnidad,
             fechaHoraControl: fechaControl,
+            jefeSeguridad: jefeSeguridad.trim(),
             personal: { cantidad: cantPersonal, estado: novPersonal, detalles: { faltantes, abandono, arrestados, permisos } },
             servicio: { rutina: casosRutina, relevantes: casosRelevantes }
         });
@@ -211,6 +216,18 @@ export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, 
                                 className="w-full bg-white border border-gray-200 rounded-xl p-2 text-sm text-gray-700 font-mono shadow-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                                 value={fechaControl}
                                 onChange={e => setFechaControl(e.target.value)}
+                            />
+                        </div>
+
+                        {/* 1.1 JEFE DE SEGURIDAD (New Field) */}
+                        <div className="flex flex-col gap-1.5 align-top">
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Jefe de Seguridad / Responsable</label>
+                            <input
+                                type="text"
+                                className="w-full bg-white border border-gray-200 rounded-xl p-2 text-sm text-gray-800 placeholder-gray-400 shadow-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                                placeholder="Grado y Nombre Completo"
+                                value={jefeSeguridad}
+                                onChange={e => setJefeSeguridad(e.target.value)}
                             />
                         </div>
 

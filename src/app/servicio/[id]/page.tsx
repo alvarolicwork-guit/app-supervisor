@@ -12,6 +12,7 @@ import { cerrarServicioSupervisor, getServicioById, type ServicioSupervisor } fr
 import { agregarServicioExtraordinario, cerrarServicioExtraordinario } from '@/services/servicioExtraordinarioService';
 import { ServicioExtraordinario, AperturaServicioExtra, CierreServicioExtra } from '@/types/servicioExtraordinario';
 import { useAuth } from '@/context/AuthContext';
+import { generarInformeTexto } from '@/utils/reporteSupervisor';
 
 export default function ServicioDashboardPage() {
     const router = useRouter();
@@ -73,7 +74,13 @@ export default function ServicioDashboardPage() {
         if (!servicio) return;
 
         try {
-            await cerrarServicioSupervisor(servicio.id!, datos);
+            // Generar informe final
+            const informeTexto = generarInformeTexto(servicio, datos);
+
+            await cerrarServicioSupervisor(servicio.id!, {
+                ...datos,
+                informeFinal: informeTexto
+            });
 
             // Actualizar estado local
             const updatedService: ServicioSupervisor = {
@@ -81,7 +88,8 @@ export default function ServicioDashboardPage() {
                 estado: 'cerrado',
                 cierre: {
                     fechaHora: new Date(),
-                    ...datos
+                    ...datos,
+                    informeFinal: informeTexto
                 }
             };
             setServicio(updatedService);
@@ -241,33 +249,17 @@ export default function ServicioDashboardPage() {
 function ReporteView({ servicio, onVolver }: { servicio: ServicioSupervisor; onVolver: () => void }) {
     // Generate simple text report for copy/paste
     const generarTextoReporte = () => {
-        let texto = `REPORTE DE SERVICIO DE SUPERVISOR\n`;
-        texto += `--------------------------------\n`;
-        texto += `Fecha: ${servicio.createdAt.toLocaleDateString()}\n`;
-        texto += `Supervisor Saliente: ${servicio.apertura.supervisorActual.grado} ${servicio.apertura.supervisorActual.nombreCompleto}\n`;
-        texto += `Entregado a: ${servicio.cierre?.entregaServicio || 'N/A'}\n\n`;
-
-        texto += `RESUMEN ESTADÍSTICO\n`;
-        texto += `- Casos Rutinarios: ${servicio.cierre?.casosRutinarios || 0}\n`;
-        texto += `- Casos Relevantes: ${servicio.cierre?.casosRelevantes || 0}\n\n`;
-
-        texto += `CONTROL DE UNIDADES (${servicio.controlInstalaciones?.length || 0})\n`;
-        servicio.controlInstalaciones?.forEach((u: any, i: number) => {
-            texto += `${i + 1}. ${u.unidad}: ${u.novedades ? 'Con Novedad' : 'Sin Novedad'}\n`;
-            if (u.novedades) texto += `   Detalle: ${u.descripcionNovedad}\n`;
-        });
-        texto += `\n`;
-
-        texto += `SERVICIOS EXTRAORDINARIOS\n`;
-        if (!servicio.serviciosExtraordinarios || servicio.serviciosExtraordinarios.length === 0) {
-            texto += `Sin servicios extraordinarios registrados.\n`;
-        } else {
-            // Basic summary if available, usually extracted from sub-collection or similar structure if expanded
-            // For now just count
-            texto += `Total: ${servicio.serviciosExtraordinarios.length}\n`;
+        // Si ya existe un informe guardado, usarlo.
+        if (servicio.cierre?.informeFinal) {
+            return servicio.cierre.informeFinal;
         }
 
-        return texto;
+        // Fallback para servicios antiguos (aunque no deberían existir con este formato nuevo)
+        return `INFORME
+        
+Este servicio fue cerrado con una versión anterior del sistema y no cuenta con el formato de informe automatizado guardado.
+Por favor, consulte los detalles en el dashboard.
+        `;
     };
 
     const copiarPortapapeles = () => {

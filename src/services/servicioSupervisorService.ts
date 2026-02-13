@@ -27,6 +27,7 @@ export interface ServicioSupervisor {
         entregaServicio: string; // Grado y nombre completo
         casosRutinarios: number;
         casosRelevantes: number;
+        informeFinal?: string;
     };
 
     createdAt: Date;
@@ -178,6 +179,7 @@ export async function cerrarServicioSupervisor(servicioId: string, datosCierre: 
     entregaServicio: string;
     casosRutinarios: number;
     casosRelevantes: number;
+    informeFinal?: string;
 }): Promise<void> {
     const docRef = doc(db, 'servicios_supervisor', servicioId);
 
@@ -187,7 +189,8 @@ export async function cerrarServicioSupervisor(servicioId: string, datosCierre: 
             fechaHora: serverTimestamp(),
             entregaServicio: datosCierre.entregaServicio,
             casosRutinarios: datosCierre.casosRutinarios,
-            casosRelevantes: datosCierre.casosRelevantes
+            casosRelevantes: datosCierre.casosRelevantes,
+            informeFinal: datosCierre.informeFinal || ''
         },
     });
 }
