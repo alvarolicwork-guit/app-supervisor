@@ -193,6 +193,14 @@ export async function cerrarServicioSupervisor(servicioId: string, datosCierre: 
 }
 
 /**
+ * Eliminar servicio permanentemente (Admin)
+ */
+export async function deleteServicio(servicioId: string): Promise<void> {
+    const docRef = doc(db, 'servicios_supervisor', servicioId);
+    await deleteDoc(docRef);
+}
+
+/**
  * Agregar registro de instalación al servicio activo
  * NOTA: Esta función antes usaba getServicioActivo sin argumentos. 
  * Ahora requeriría pasarle el servicioId directamente desde la UI que ya lo tiene.

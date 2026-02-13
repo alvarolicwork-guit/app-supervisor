@@ -291,9 +291,11 @@ function RegistroUsuarioModal({ onClose, onSuccess }: { onClose: () => void; onS
     );
 }
 
+
 function ServiciosTab({ router }: { router: any }) {
     const [servicios, setServicios] = useState<ServicioSupervisor[]>([]);
     const [loading, setLoading] = useState(true);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
     useEffect(() => {
         cargarServicios();
@@ -310,6 +312,27 @@ function ServiciosTab({ router }: { router: any }) {
         }
     };
 
+    const handleDelete = async (id: string) => {
+        if (!confirm('⚠️ ¿Estás seguro de eliminar este registro PERMANENTEMENTE?\n\nEsta acción no se puede deshacer.')) {
+            return;
+        }
+
+        setDeletingId(id);
+        try {
+            const { deleteServicio } = await import('@/services/servicioSupervisorService');
+            await deleteServicio(id);
+
+            // Actualizar lista localmente
+            setServicios(prev => prev.filter(s => s.id !== id));
+            alert('✅ Servicio eliminado correctamente');
+        } catch (error: any) {
+            console.error(error);
+            alert('❌ Error al eliminar: ' + error.message);
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <h2 className="text-2xl font-bold text-slate-800">Servicios Globales</h2>
@@ -323,7 +346,7 @@ function ServiciosTab({ router }: { router: any }) {
                         <p className="text-center text-slate-500 italic py-8">No hay servicios registrados en el sistema.</p>
                     ) : (
                         servicios.map((servicio) => (
-                            <div key={servicio.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:shadow-md transition-all">
+                            <div key={servicio.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:shadow-md transition-all group/item">
                                 <div className="flex justify-between items-start">
                                     <div className="flex-1">
                                         <div className="flex items-center gap-3 mb-2">
@@ -339,13 +362,35 @@ function ServiciosTab({ router }: { router: any }) {
                                             <span className="font-semibold">{servicio.apertura.supervisorActual.grado} {servicio.apertura.supervisorActual.nombreCompleto}</span>
                                         </p>
                                     </div>
-                                    <button
-                                        onClick={() => router.push(`/servicio/${servicio.id}`)}
-                                        className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-medium hover:bg-blue-100 transition-colors flex items-center gap-2"
-                                    >
-                                        <Eye className="w-4 h-4" />
-                                        Ver
-                                    </button>
+
+                                    <div className="flex items-center gap-2">
+                                        {/* Botón Eliminar (Solo para cerrados) */}
+                                        {servicio.estado === 'cerrado' && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (servicio.id) handleDelete(servicio.id);
+                                                }}
+                                                disabled={deletingId === servicio.id}
+                                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                title="Eliminar registro permanentemente"
+                                            >
+                                                {deletingId === servicio.id ? (
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                ) : (
+                                                    <X className="w-4 h-4" />
+                                                )}
+                                            </button>
+                                        )}
+
+                                        <button
+                                            onClick={() => router.push(`/servicio/${servicio.id}`)}
+                                            className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-medium hover:bg-blue-100 transition-colors flex items-center gap-2"
+                                        >
+                                            <Eye className="w-4 h-4" />
+                                            Ver
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         ))
