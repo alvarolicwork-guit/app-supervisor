@@ -1,4 +1,4 @@
-import { generateContentDirect } from '@/ai/geminiDirect';
+import { generateContentAction } from '@/app/actions/ai';
 import { AperturaServicioExtra, PersonalNovedad, ObservacionUniforme } from '@/types/servicioExtraordinario';
 
 // Tipo de respuesta esperada de Gemini
@@ -142,7 +142,7 @@ export async function extractFromText(text: string): Promise<Partial<AperturaSer
     }
 
     const prompt = buildExtractionPrompt(text, 'text');
-    const response = await generateContentDirect(prompt);
+    const response = await generateContentAction(prompt);
     const extracted = parseGeminiResponse(response);
 
     return mapToAperturaData(extracted);
