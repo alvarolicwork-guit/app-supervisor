@@ -304,7 +304,7 @@ export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, 
                                 <div className="flex gap-2 mb-3">
                                     <input
                                         className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-200 outline-none"
-                                        placeholder={`Nombre del personal (${tipoAgregando})...`}
+                                        placeholder={`Grado y Nombre (${tipoAgregando})...`}
                                         value={tempNombre}
                                         onChange={e => setTempNombre(e.target.value)}
                                         onKeyDown={e => e.key === 'Enter' && addPersonalList()}
