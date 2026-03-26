@@ -4,7 +4,10 @@ import { AperturaServicioExtra, PersonalNovedad, ObservacionUniforme } from '@/t
 // Tipo de respuesta esperada de Gemini
 interface GeminiExtractionResponse {
     nroPlanOperaciones?: string;
+    tipoServicio?: string;
     personalContemplado?: number;
+    motosContempladas?: number;
+    vehiculosContemplados?: number;
     supervisorGeneral?: string;
     jefeOperativo?: string;
     lugarFormacion?: string;
@@ -15,16 +18,21 @@ interface GeminiExtractionResponse {
     personalFaltoLista?: PersonalNovedad[];
     personalPermisoCantidad?: number;
     personalPermisoLista?: PersonalNovedad[];
-    personalAtrasadoCantidad?: number;
-    personalAtrasadoLista?: PersonalNovedad[];
     observacionesUniforme?: ObservacionUniforme[];
+    tareas?: string;
     casosRelevantes?: {
         tipo: string;
         hora: string;
         lugar: string;
         encargado: string;
-        detalle: string;
+        breveRelacion: string;
     }[];
+    dudas?: Record<string, string[]>;
+}
+
+export interface ExtractionResult {
+    data: Partial<AperturaServicioExtra>;
+    dudas?: Record<string, string[]>;
 }
 
 /**
@@ -45,65 +53,45 @@ Se te proporciona ${sourceDescription[sourceType]} que contiene información sob
 
 CAMPOS A EXTRAER (si están disponibles):
 1. nroPlanOperaciones - Número del plan (Ej: "1576/2025", "OP-045/2024")
-2. personalContemplado - Número total de personal (Ej: 22)
-3. supervisorGeneral - Grado + Nombre completo (Ej: "Tcnl. DEAP Alberto Suarez Plata")
-4. jefeOperativo - Grado + Nombre completo del jefe operativo
-5. lugarFormacion - Lugar donde se forma el personal (Ej: "Multipropósito", "Patio Central")
-6. horaFormacion - Hora de formación en formato HH:MM (Ej: "14:00")
-7. horaInstalacion - Hora de instalación en formato HH:MM (Ej: "14:15")
-8. personalFormo - Número de personal que formó
-9. personalFaltoCantidad - Número de personal que faltó
-10. personalFaltoLista - Array de { gradoNombre } del personal que faltó (Ej: "Sgto. Carlos Mamani")
-11. personalPermisoCantidad - Número de personal con permiso
-12. personalPermisoLista - Array de { gradoNombre } del personal con permiso
-13. personalPaso - Número de personal que pasó
-14. personalAtrasadoCantidad - Número de personal atrasado
-15. personalAtrasadoLista - Array de { gradoNombre } del personal atrasado
+2. tipoServicio - El nombre o descripción del servicio/operativo que aparece debajo del número de orden (Ej: "ESPACIOS PUBLICOS SEGUROS, PREVENCION Y CONTROL DEL CONSUMO DE ALCOHOL"). Extrae el texto completo y descriptivo.
+3. personalContemplado - Número total de personal (Ej: 65). Busca el "TOTAL" en la columna "EFECTIVO POLICIAL".
+4. motosContempladas - Número total de motocicletas. Busca el "TOTAL" en la columna "MTS" (debajo de MOTORIZADOS).
+5. vehiculosContemplados - Número total de vehículos. Busca el "TOTAL" en la columna "VL" (debajo de MOTORIZADOS).
+6. supervisorGeneral - Grado + Nombre completo (Ej: "Tcnl. DEAP Alberto Suarez Plata")
+7. jefeOperativo - Grado + Nombre completo del jefe operativo
+8. lugarFormacion - Lugar donde se forma el personal (Ej: "Multipropósito", "Patio Central")
+9. horaFormacion - Hora de formación en formato HH:MM (Ej: "14:00")
+10. horaInstalacion - Hora de instalación en formato HH:MM (Ej: "14:15")
+11. personalFormo - Número de personal que formó
+12. personalFaltoCantidad - Número de personal que faltó a la formación
+13. personalFaltoLista - Array de { gradoNombre } del personal que faltó a la formación (Ej: "Sgto. Carlos Mamani")
+14. personalPermisoCantidad - Número de personal con permiso
+15. personalPermisoLista - Array de { gradoNombre } del personal con permiso
 16. observacionesUniforme - Array de { gradoNombre, tipo } (tipo: "Incorrecto", "Sucio/Desarreglado" o "Incompleto")
-17. casosRelevantes - Array de casos/novedades ocurridas DURANTE el servicio (tipo, hora, lugar, encargado, detalle). NO incluyas novedades de formación aquí.
+17. tareas - RESUMEN de la misión y ejecución (Sección II del PDF, incisos A, B y C). Genera un resumen formal, específico y profesional de máximo 500 caracteres.
+18. casosRelevantes - Array de { tipo, hora, lugar, encargado, breveRelacion }
 
-INSTRUCCIONES:
+Manejo de Incertidumbre y Ambigüedad (IMPORTANTE):
+- Si tienes dudas razonables sobre algún campo (por ejemplo, hay varios nombres y no estás seguro de cuál es el Jefe Operativo), NO adivines ni lo incluyas en la raíz del objeto.
+- En su lugar, agrega el nombre del campo exacto dentro de un objeto opcional llamado "dudas", junto con un array de las posibles opciones que encontraste.
+- Ejemplo de objeto JSON si tienes dudas sobre el Jefe Operativo:
+{
+  "nroPlanOperaciones": "1576/2025",
+  "dudas": {
+    "jefeOperativo": ["May. Juan Perez", "Tcnl. Luis Silva"],
+    "lugarFormacion": ["Multipropósito", "Patio Central"]
+  }
+}
+
+INSTRUCCIONES EXTRA:
 - Extrae SOLO la información que encuentres explícitamente en el documento
 - Para campos numéricos usa números, no strings
 - Para horas usa formato "HH:MM" (24 horas)
 - Para personal, usa un objeto con "gradoNombre" que contenga TODO (Grado y Nombre)
 - Si un campo no está presente, NO lo incluyas en la respuesta
+- Retorna SOLO un objeto JSON válido, sin delimitadores como \`\`\`json.
 
-FORMATO DE RESPUESTA:
-Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional antes o después.
-
-Ejemplo:
-{
-  "nroPlanOperaciones": "1576/2025",
-  "personalContemplado": 22,
-  "supervisorGeneral": "Tcnl. DEAP Alberto Suarez Plata",
-  "jefeOperativo": "May. Juan Pérez López",
-  "lugarFormacion": "Multipropósito",
-  "horaFormacion": "14:00",
-  "horaInstalacion": "14:15",
-  "personalFormo": 22,
-  "personalFaltoCantidad": 2,
-  "personalFaltoLista": [
-    { "gradoNombre": "Sgto. Carlos Mamani" },
-    { "gradoNombre": "Cbte. Luis Torres" }
-  ],
-  "personalPermisoCantidad": 1,
-  "personalPermisoLista": [
-    { "gradoNombre": "Sgto. 1º María González" }
-  ],
-  "personalAtrasadoCantidad": 0,
-  "casosRelevantes": [
-      {
-          "tipo": "Riña y Pelea",
-          "hora": "16:30",
-          "lugar": "Tribuna Sur",
-          "encargado": "Sgto. Perez",
-          "detalle": "Se intervino una pelea entre dos personas..."
-      }
-  ]
-}
-
-DOCUMENTO A ANALIZAR:
+CONTENIDO A ANALIZAR:
 ${content}
 
 RESPUESTA (solo JSON):`;
@@ -136,7 +124,7 @@ function parseGeminiResponse(response: string): GeminiExtractionResponse {
 /**
  * Extraer información desde texto plano (WhatsApp)
  */
-export async function extractFromText(text: string): Promise<Partial<AperturaServicioExtra>> {
+export async function extractFromText(text: string): Promise<ExtractionResult> {
     if (!text.trim()) {
         throw new Error('El texto no puede estar vacío');
     }
@@ -145,31 +133,52 @@ export async function extractFromText(text: string): Promise<Partial<AperturaSer
     const response = await generateContentAction(prompt);
     const extracted = parseGeminiResponse(response);
 
-    return mapToAperturaData(extracted);
+    return {
+        data: mapToAperturaData(extracted),
+        dudas: extracted.dudas
+    };
 }
 
 /**
  * Extraer información desde PDF
  */
-export async function extractFromPDF(file: File): Promise<Partial<AperturaServicioExtra>> {
-    // TODO: Implementar extracción de texto de PDF con pdf.js
-    // Por ahora, lanzar error indicando que está en desarrollo
-    throw new Error('La extracción desde PDF estará disponible próximamente. Por favor usa texto o imagen.');
+export async function extractFromPDF(file: File): Promise<ExtractionResult> {
+    const prompt = buildExtractionPrompt('Extrae la información relevante del Plan de Operaciones en el documento PDF adjunto.', 'pdf');
+    
+    // Convertir File a base64
+    const base64String = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            const result = reader.result as string;
+            // Remover metadata data:MIME_TYPE;base64,
+            const base64 = result.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = error => reject(error);
+    });
+
+    const fileData = {
+        base64: base64String,
+        mimeType: file.type || 'application/pdf'
+    };
+
+    const response = await generateContentAction(prompt, fileData);
+    const extracted = parseGeminiResponse(response);
+
+    return {
+        data: mapToAperturaData(extracted),
+        dudas: extracted.dudas
+    };
 }
 
 /**
- * Extraer información desde imagen (OCR con Gemini Vision)
+ * Extraer información desde una Imagen
  */
-export async function extractFromImage(file: File): Promise<Partial<AperturaServicioExtra>> {
-    // Convertir imagen a base64
-    const base64 = await fileToBase64(file);
-
-    const prompt = buildExtractionPrompt('Imagen adjunta', 'image');
-
-    // Gemini puede procesar imágenes directamente
-    // Por ahora usar el endpoint de texto y indicar que hay imagen
-    // TODO: Actualizar geminiDirect para soportar imágenes
-    throw new Error('La extracción desde imagen estará disponible próximamente. Por favor usa texto.');
+export async function extractFromImage(_file: File): Promise<ExtractionResult> {
+    void _file;
+    // TODO: Implementar extracción desde imagen
+    throw new Error('La extracción desde imagen estará disponible próximamente. Por favor usa texto o PDF.');
 }
 
 /**
@@ -179,15 +188,19 @@ function mapToAperturaData(extracted: GeminiExtractionResponse): Partial<Apertur
     const mapped: Partial<AperturaServicioExtra> = {};
 
     if (extracted.nroPlanOperaciones) mapped.nroPlanOperaciones = extracted.nroPlanOperaciones;
+    if (extracted.tipoServicio) mapped.tipoServicio = extracted.tipoServicio;
     if (extracted.personalContemplado) mapped.personalContemplado = extracted.personalContemplado;
+    if (extracted.motosContempladas) mapped.motosContempladas = extracted.motosContempladas;
+    if (extracted.vehiculosContemplados) mapped.vehiculosContemplados = extracted.vehiculosContemplados;
     if (extracted.supervisorGeneral) mapped.supervisorGeneral = extracted.supervisorGeneral;
     if (extracted.jefeOperativo) mapped.jefeOperativo = extracted.jefeOperativo;
     if (extracted.lugarFormacion) mapped.lugarFormacion = extracted.lugarFormacion;
     if (extracted.horaFormacion) mapped.horaFormacion = extracted.horaFormacion;
     if (extracted.horaInstalacion) mapped.horaInstalacion = extracted.horaInstalacion;
+    if (extracted.tareas) mapped.tareas = extracted.tareas;
 
     // Mapear novedades de formación
-    if (extracted.personalFormo || extracted.personalFaltoCantidad || extracted.personalPermisoCantidad || extracted.personalAtrasadoCantidad) {
+    if (extracted.personalFormo || extracted.personalFaltoCantidad || extracted.personalPermisoCantidad) {
         mapped.novedadesFormacion = {
             personalFormo: extracted.personalFormo || 0,
             personalFalto: {
@@ -198,10 +211,6 @@ function mapToAperturaData(extracted: GeminiExtractionResponse): Partial<Apertur
                 cantidad: extracted.personalPermisoCantidad || 0,
                 lista: extracted.personalPermisoLista || []
             },
-            personalAtrasado: {
-                cantidad: extracted.personalAtrasadoCantidad || 0,
-                lista: extracted.personalAtrasadoLista || []
-            },
             observacionesUniforme: extracted.observacionesUniforme || []
         };
     }
@@ -209,19 +218,3 @@ function mapToAperturaData(extracted: GeminiExtractionResponse): Partial<Apertur
     return mapped;
 }
 
-/**
- * Convertir archivo a base64
- */
-async function fileToBase64(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-            const base64 = reader.result as string;
-            // Remover el prefijo data:image/...;base64,
-            const base64Data = base64.split(',')[1];
-            resolve(base64Data);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-    });
-}

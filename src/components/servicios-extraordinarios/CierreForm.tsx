@@ -1,21 +1,33 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Save, Plus, Trash2, Users, Clock, Sparkles } from 'lucide-react';
-import { PersonalNovedad, CierreServicioExtra, CasoRelevante } from '@/types/servicioExtraordinario';
+import { X, Save, Plus, Trash2, Users, Clock, Sparkles, Check } from 'lucide-react';
+import { PersonalNovedad, CierreServicioExtra, CasoRelevante, AperturaServicioExtra } from '@/types/servicioExtraordinario';
 import { AIExtractionModal } from './AIExtractionModal';
+import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
+
+type AIExtractionData = Partial<AperturaServicioExtra> & {
+    casosRelevantes?: CasoRelevante[];
+    casos?: CasoRelevante[];
+    observaciones?: string;
+};
 
 interface CierreFormProps {
     personalFaltoInicial: PersonalNovedad[];  // Heredado de apertura
-    personalAtrasadoInicial?: PersonalNovedad[]; // Heredado de apertura
     onSave: (data: CierreServicioExtra) => void;
     onCancel: () => void;
 }
 
-export function CierreForm({ personalFaltoInicial, personalAtrasadoInicial = [], onSave, onCancel }: CierreFormProps) {
-    // Estado heredado + local
-    const [personalFalto, setPersonalFalto] = useState<PersonalNovedad[]>(personalFaltoInicial);
-    const [personalAtrasado, setPersonalAtrasado] = useState<PersonalNovedad[]>(personalAtrasadoInicial);
+export function CierreForm({ personalFaltoInicial, onSave, onCancel }: CierreFormProps) {
+    // Separar personal que ya se incorporó de los que siguen faltando
+    const atrasados = personalFaltoInicial.filter(p => !!p.horaIncorporacion);
+    const faltasIniciales = personalFaltoInicial.filter(p => !p.horaIncorporacion);
+
+    // Estado para personal que finalmente NO se presentó
+    const [personalFalto, setPersonalFalto] = useState<PersonalNovedad[]>(faltasIniciales);
+    const [personalIncorporadoTarde, setPersonalIncorporadoTarde] = useState<PersonalNovedad[]>(atrasados);
+    const [incorporacionTarget, setIncorporacionTarget] = useState<string | null>(null);
+    const [incorporacionHora, setIncorporacionHora] = useState('');
 
     // Novedades y Casos
     const [tipoNovedades, setTipoNovedades] = useState<'sin' | 'con'>('sin');
@@ -27,10 +39,10 @@ export function CierreForm({ personalFaltoInicial, personalAtrasadoInicial = [],
 
     // Temporal para agregar personal
     const [tempGradoNombre, setTempGradoNombre] = useState('');
-    const [tempAtrasadoGradoNombre, setTempAtrasadoGradoNombre] = useState('');
 
     // AI Modal
     const [showAIModal, setShowAIModal] = useState(false);
+    const [notice, setNotice] = useState<InlineAlertData | null>(null);
 
     // Temporal para agregar casos
     const [tempTipo, setTempTipo] = useState('');
@@ -51,16 +63,26 @@ export function CierreForm({ personalFaltoInicial, personalAtrasadoInicial = [],
         setPersonalFalto(personalFalto.filter((_, i) => i !== index));
     };
 
-    // --- Handlers Personal Atrasado ---
-    const agregarPersonalAtrasado = () => {
-        if (tempAtrasadoGradoNombre) {
-            setPersonalAtrasado([...personalAtrasado, { gradoNombre: tempAtrasadoGradoNombre }]);
-            setTempAtrasadoGradoNombre('');
-        }
+    const iniciarIncorporacion = (gradoNombre: string) => {
+        setIncorporacionTarget(gradoNombre);
+        const now = new Date();
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        setIncorporacionHora(`${hh}:${mm}`);
     };
 
-    const eliminarPersonalAtrasado = (index: number) => {
-        setPersonalAtrasado(personalAtrasado.filter((_, i) => i !== index));
+    const confirmarIncorporacion = () => {
+        if (!incorporacionTarget || !incorporacionHora) return;
+
+        setPersonalFalto((prev) => prev.filter((p) => p.gradoNombre !== incorporacionTarget));
+        setPersonalIncorporadoTarde((prev) => [...prev, { gradoNombre: incorporacionTarget, horaIncorporacion: incorporacionHora }]);
+        setIncorporacionTarget(null);
+        setIncorporacionHora('');
+    };
+
+    const revertirIncorporacion = (gradoNombre: string) => {
+        setPersonalIncorporadoTarde((prev) => prev.filter((p) => p.gradoNombre !== gradoNombre));
+        setPersonalFalto((prev) => [...prev, { gradoNombre }]);
     };
 
     // --- Handlers Casos ---
@@ -88,7 +110,7 @@ export function CierreForm({ personalFaltoInicial, personalAtrasadoInicial = [],
     };
 
     // --- AI Handler ---
-    const handleAIExtraction = (data: any) => {
+    const handleAIExtraction = (data: AIExtractionData) => {
         // La IA devuelve un objeto parcial de Apertura, pero usamos los campos mapeados en el servicio
         // En este caso, aiExtractionService.ts fue actualizado para devolver 'casosRelevantes' en el raw response,
         // pero necesitamos acceder a ello.
@@ -119,16 +141,21 @@ export function CierreForm({ personalFaltoInicial, personalAtrasadoInicial = [],
         }
 
         setShowAIModal(false);
-        alert('✅ Novedades extraídas. Verifica los datos.');
+        setNotice({ type: 'success', message: 'Novedades extraídas. Verifica los datos.' });
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (isSubmitting) return;
+        setIsSubmitting(true);
 
         const data: CierreServicioExtra = {
             fechaCierre: new Date(),
             personalFaltoServicio: personalFalto,
-            personalAtrasadoServicio: personalAtrasado,
+            personalIncorporadoTarde,
             novedades: {
                 tipo: tipoNovedades,
                 ...(tipoNovedades === 'con' && { casos }),
@@ -136,7 +163,12 @@ export function CierreForm({ personalFaltoInicial, personalAtrasadoInicial = [],
             }
         };
 
-        onSave(data);
+        try {
+            await onSave(data);
+        } catch (error) {
+            console.error(error);
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -151,6 +183,7 @@ export function CierreForm({ personalFaltoInicial, personalAtrasadoInicial = [],
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[calc(100vh-200px)] overflow-y-auto">
+                    {notice && <InlineAlert notice={notice} onClose={() => setNotice(null)} />}
 
                     {/* Botón IA para Novedades */}
                     <div className="flex justify-end">
@@ -163,77 +196,104 @@ export function CierreForm({ personalFaltoInicial, personalAtrasadoInicial = [],
                             Auto-completar Novedades con IA
                         </button>
                     </div>
-
-                    <div className="grid md:grid-cols-2 gap-6">
-                        {/* Personal que Faltó al Servicio */}
-                        <div className="bg-red-50 p-4 rounded-xl space-y-3 border border-red-100">
-                            <h3 className="font-bold text-lg text-red-900 flex items-center gap-2">
-                                <Users className="w-5 h-5" />
-                                Personal Faltó al Servicio
-                            </h3>
-                            <p className="text-xs text-red-700">
-                                Lista heredada de la apertura.
-                            </p>
-
-                            {personalFalto.length > 0 && (
-                                <div className="space-y-2 max-h-40 overflow-y-auto">
-                                    {personalFalto.map((p, i) => (
-                                        <div key={i} className="flex items-center justify-between bg-white p-2 rounded border border-red-200 shadow-sm">
-                                            <span className="text-sm font-medium">{p.gradoNombre}</span>
-                                            <button type="button" onClick={() => eliminarPersonalFalto(i)} className="text-red-400 hover:text-red-700">
-                                                <Trash2 className="w-4 h-4" />
+ 
+                    <div className="max-w-xl mx-auto w-full space-y-6">
+                        {/* Personal ATRASADO (Incorporado) */}
+                        {personalIncorporadoTarde.length > 0 && (
+                            <div className="bg-green-50 p-4 rounded-xl space-y-2 border border-green-100">
+                                <h3 className="font-bold text-sm text-green-900 flex items-center gap-2">
+                                    <Clock className="w-4 h-4" />
+                                    Personal que llegó con retraso (Atrasados)
+                                </h3>
+                                <div className="space-y-1">
+                                    {personalIncorporadoTarde.map((p, i) => (
+                                        <div key={i} className="flex justify-between items-center text-xs text-green-700 bg-white/50 px-2 py-1 rounded">
+                                            <div>
+                                                <span>{p.gradoNombre}</span>
+                                                <span className="font-bold ml-2">Presente a hrs {p.horaIncorporacion}</span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => revertirIncorporacion(p.gradoNombre)}
+                                                className="text-[10px] px-2 py-1 rounded bg-white border border-green-200 hover:bg-green-100"
+                                            >
+                                                Marcar falta
                                             </button>
                                         </div>
                                     ))}
                                 </div>
-                            )}
+                            </div>
+                        )}
 
+                        {/* Personal que Faltó al Servicio */}
+                        <div className="bg-red-50 p-4 rounded-xl space-y-3 border border-red-100">
+                            <h3 className="font-bold text-lg text-red-900 flex items-center gap-2">
+                                <Users className="w-5 h-5" />
+                                Faltas Definitivas al Servicio
+                            </h3>
+                            <p className="text-xs text-red-700 font-medium">
+                                Confirme quiénes NO se presentaron en todo el servicio.
+                            </p>
+ 
+                            {personalFalto.length > 0 && (
+                                <div className="space-y-2 max-h-40 overflow-y-auto">
+                                    {personalFalto.map((p, i) => (
+                                        <div key={i} className="bg-white p-2 rounded border border-red-200 shadow-sm space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm font-medium">{p.gradoNombre}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => iniciarIncorporacion(p.gradoNombre)}
+                                                        className="text-[10px] px-2 py-1 rounded bg-green-600 text-white hover:bg-green-700"
+                                                    >
+                                                        Retirar falta
+                                                    </button>
+                                                    <button type="button" onClick={() => eliminarPersonalFalto(i)} className="text-red-400 hover:text-red-700">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {incorporacionTarget === p.gradoNombre && (
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="time"
+                                                        value={incorporacionHora}
+                                                        onChange={(e) => setIncorporacionHora(e.target.value)}
+                                                        className="px-2 py-1 text-xs border border-green-300 rounded"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={confirmarIncorporacion}
+                                                        className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-green-700 text-white hover:bg-green-800"
+                                                    >
+                                                        <Check className="w-3 h-3" />
+                                                        Confirmar
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setIncorporacionTarget(null)}
+                                                        className="text-[10px] px-2 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+                                                    >
+                                                        Cancelar
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+ 
                             <div className="flex gap-2">
                                 <input
                                     type="text"
                                     value={tempGradoNombre}
                                     onChange={(e) => setTempGradoNombre(e.target.value)}
-                                    placeholder="Grado y Nombre"
+                                    placeholder="Agregar grado y nombre..."
                                     className="flex-1 px-3 py-2 border rounded-lg text-sm"
                                 />
                                 <button type="button" onClick={agregarPersonalFalto} className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
-                                    <Plus className="w-4 h-4" />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Personal Atrasado */}
-                        <div className="bg-yellow-50 p-4 rounded-xl space-y-3 border border-yellow-100">
-                            <h3 className="font-bold text-lg text-yellow-900 flex items-center gap-2">
-                                <Clock className="w-5 h-5" />
-                                Personal Atrasado
-                            </h3>
-                            <p className="text-xs text-yellow-700">
-                                Lista heredada de la apertura.
-                            </p>
-
-                            {personalAtrasado.length > 0 && (
-                                <div className="space-y-2 max-h-40 overflow-y-auto">
-                                    {personalAtrasado.map((p, i) => (
-                                        <div key={i} className="flex items-center justify-between bg-white p-2 rounded border border-yellow-200 shadow-sm">
-                                            <span className="text-sm font-medium">{p.gradoNombre}</span>
-                                            <button type="button" onClick={() => eliminarPersonalAtrasado(i)} className="text-yellow-600 hover:text-yellow-800">
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={tempAtrasadoGradoNombre}
-                                    onChange={(e) => setTempAtrasadoGradoNombre(e.target.value)}
-                                    placeholder="Grado y Nombre"
-                                    className="flex-1 px-3 py-2 border rounded-lg text-sm"
-                                />
-                                <button type="button" onClick={agregarPersonalAtrasado} className="px-3 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">
                                     <Plus className="w-4 h-4" />
                                 </button>
                             </div>
@@ -333,12 +393,30 @@ export function CierreForm({ personalFaltoInicial, personalAtrasadoInicial = [],
 
                     {/* Buttons */}
                     <div className="flex gap-3 pt-4 border-t">
-                        <button type="button" onClick={onCancel} className="flex-1 px-6 py-3 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 text-gray-700">
+                        <button
+                            type="button"
+                            onClick={onCancel}
+                            disabled={isSubmitting}
+                            className="flex-1 px-6 py-3 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 text-gray-700 disabled:opacity-50"
+                        >
                             Cancelar
                         </button>
-                        <button type="submit" className="flex-1 px-6 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 flex items-center justify-center gap-2 shadow-lg shadow-red-200">
-                            <Save className="w-5 h-5" />
-                            Cerrar Servicio
+                        <button
+                            type="submit"
+                            disabled={isSubmitting}
+                            className="flex-1 px-6 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 flex items-center justify-center gap-2 shadow-lg shadow-red-200 disabled:opacity-70 disabled:cursor-not-allowed"
+                        >
+                            {isSubmitting ? (
+                                <>
+                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    Cerrando...
+                                </>
+                            ) : (
+                                <>
+                                    <Save className="w-5 h-5" />
+                                    Cerrar Servicio
+                                </>
+                            )}
                         </button>
                     </div>
                 </form>

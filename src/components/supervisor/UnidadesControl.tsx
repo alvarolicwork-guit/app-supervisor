@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Building2, MapPin, ChevronRight, ArrowLeft } from 'lucide-react';
 import { FormularioUnidad } from './FormularioUnidad';
 import { ResumenTurno, DatosUnidadRegistrada } from './ResumenTurno';
 import { useAuth } from '@/context/AuthContext';
+import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
 
 type Unidad = {
     id: string;
@@ -77,14 +78,9 @@ export function UnidadesControl({ servicioId, soloLectura = false }: UnidadesCon
     // Estado para el Dashboard (Registros de la sesión actual)
     const [registrosSesion, setRegistrosSesion] = useState<DatosUnidadRegistrada[]>([]);
     const [loading, setLoading] = useState(true);
+    const [notice, setNotice] = useState<InlineAlertData | null>(null);
 
-    useEffect(() => {
-        if (user) {
-            cargarRegistros();
-        }
-    }, [servicioId, user]);
-
-    const cargarRegistros = async () => {
+    const cargarRegistros = useCallback(async () => {
         if (!user) return;
         setLoading(true);
         try {
@@ -100,7 +96,13 @@ export function UnidadesControl({ servicioId, soloLectura = false }: UnidadesCon
         } finally {
             setLoading(false);
         }
-    };
+    }, [user, servicioId]);
+
+    useEffect(() => {
+        if (user) {
+            void cargarRegistros();
+        }
+    }, [user, cargarRegistros]);
 
     const guardarEnSesion = async (nuevoRegistro: DatosUnidadRegistrada) => {
         // Actualizar estado local inmediatamente
@@ -165,16 +167,20 @@ export function UnidadesControl({ servicioId, soloLectura = false }: UnidadesCon
                             // Guardar en el servicio activo
                             await guardarEnSesion(data);
 
-                            alert(`✅ Registro guardado correctamente.`);
+                            setNotice({ type: 'success', message: 'Registro guardado correctamente.' });
                             setSelectedUnidad(null);
                             setSelectedParent(null); // Reset total al guardar
-                        } catch (e: any) {
+                        } catch (e) {
                             console.error(e);
-                            alert(`❌ Error al guardar: ${e.message}`);
+                            setNotice({
+                                type: 'error',
+                                message: `Error al guardar: ${e instanceof Error ? e.message : 'error desconocido'}`,
+                            });
                         }
                     }}
                     onCancel={() => setSelectedUnidad(null)}
                 />
+                {notice && <InlineAlert notice={notice} onClose={() => setNotice(null)} />}
             </div>
         );
     }
@@ -271,6 +277,8 @@ export function UnidadesControl({ servicioId, soloLectura = false }: UnidadesCon
                     </div>
                 </div>
             )}
+
+            {notice && <InlineAlert notice={notice} onClose={() => setNotice(null)} />}
 
             {/* DASHBOARD DE RESUMEN */}
             <ResumenTurno totalUnidadesBase={totalUnidades} registros={registrosSesion} />

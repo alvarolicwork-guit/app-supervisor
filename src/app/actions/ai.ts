@@ -2,9 +2,9 @@
 
 import { generateContentDirect } from '@/ai/geminiDirect';
 
-export async function generateContentAction(prompt: string): Promise<string> {
+export async function generateContentAction(prompt: string, fileData?: { base64: string, mimeType: string }): Promise<string> {
     try {
-        const result = await generateContentDirect(prompt);
+        const result = await generateContentDirect(prompt, fileData);
         return result;
     } catch (error: any) {
         console.error('Server Action Error:', error);

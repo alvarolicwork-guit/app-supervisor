@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { Sparkles, Loader2 } from 'lucide-react';
 import { mejorarTextoAction } from '@/app/actions';
+import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
 
 interface NovedadFormProps {
     titulo: string;
-    onSave: (data: any) => void;
+    onSave: (data: { detalle: string; resumen: string }) => void;
     onCancel?: () => void;
     tipoEntidad?: string; // Estación, Operativo, etc.
 }
@@ -15,6 +16,7 @@ export function NovedadForm({ titulo, onSave, onCancel, tipoEntidad = 'Servicio'
     const [detalle, setDetalle] = useState('');
     const [resumen, setResumen] = useState('');
     const [isAiLoading, setIsAiLoading] = useState(false);
+    const [notice, setNotice] = useState<InlineAlertData | null>(null);
 
     async function handleMejorarConIA() {
         if (!detalle.trim()) return;
@@ -23,8 +25,8 @@ export function NovedadForm({ titulo, onSave, onCancel, tipoEntidad = 'Servicio'
             const resultado = await mejorarTextoAction(detalle, `Tipo de entidad: ${tipoEntidad}`);
             setDetalle(resultado.textoMejorado);
             setResumen(resultado.resumen);
-        } catch (err) {
-            alert('Error al conectar con la IA. Intente más tarde.');
+        } catch {
+            setNotice({ type: 'error', message: 'Error al conectar con la IA. Intente más tarde.' });
         } finally {
             setIsAiLoading(false);
         }
@@ -33,6 +35,7 @@ export function NovedadForm({ titulo, onSave, onCancel, tipoEntidad = 'Servicio'
     return (
         <div className="bg-white p-4 rounded-xl border shadow-sm space-y-4">
             <h3 className="font-semibold text-gray-800 border-b pb-2">{titulo}</h3>
+            {notice && <InlineAlert notice={notice} onClose={() => setNotice(null)} />}
 
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Detalle de la Novedad (Borrador)</label>

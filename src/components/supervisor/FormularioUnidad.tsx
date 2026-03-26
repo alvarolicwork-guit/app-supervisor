@@ -1,14 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, Loader2, ClipboardPaste, Users, AlertTriangle, FileText, MapPin, Clock, UserCheck, X, CheckCircle2, Minus, Plus } from 'lucide-react';
+import { Sparkles, Loader2, ClipboardPaste, Users, AlertTriangle, FileText, Minus, Plus } from 'lucide-react';
 import { extraerDatosCasoAction } from '@/app/actions';
+import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
+import type { DatosUnidadRegistrada } from './ResumenTurno';
 
 interface FormularioUnidadProps {
     nombreUnidad: string;
     unidadId?: string;
     soloLectura?: boolean;
-    onSave: (data: any) => void;
+    onSave: (data: DatosUnidadRegistrada) => void;
     onCancel: () => void;
 }
 
@@ -113,6 +115,7 @@ export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, 
     const [showAiModal, setShowAiModal] = useState(false);
     const [aiText, setAiText] = useState('');
     const [isAiProcessing, setIsAiProcessing] = useState(false);
+    const [notice, setNotice] = useState<InlineAlertData | null>(null);
 
     // --- Funciones Personal ---
     function addPersonalList() {
@@ -127,7 +130,7 @@ export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, 
     // --- Funciones Casos ---
     function handleSaveCase() {
         if (!newCase.tipo || !newCase.detalle) {
-            alert('Debe ingresar al menos Tipo y Detalle del caso.');
+            setNotice({ type: 'error', message: 'Debe ingresar al menos tipo y detalle del caso.' });
             return;
         }
         setCasosRelevantes(prev => [...prev, { ...newCase, id: Math.random().toString(36).substring(7) }]);
@@ -140,7 +143,7 @@ export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, 
         if (!aiText.trim()) return;
         setIsAiProcessing(true);
         try {
-            const data = await extraerDatosCasoAction(aiText) as any;
+            const data = await extraerDatosCasoAction(aiText);
             if (data) {
                 // Autocompletar el formulario de nuevo caso
                 setNewCase({
@@ -158,7 +161,7 @@ export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, 
             setShowAiModal(false);
         } catch (e) {
             console.error(e);
-            alert('Error al extraer datos. Intente verificar su conexión.');
+            setNotice({ type: 'error', message: 'Error al extraer datos. Verifica tu conexión e intenta de nuevo.' });
         } finally {
             setIsAiProcessing(false);
         }
@@ -199,6 +202,7 @@ export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, 
             </div>
 
             <div className="p-5 space-y-5 overflow-y-auto max-h-[80vh]">
+                {notice && <InlineAlert notice={notice} onClose={() => setNotice(null)} />}
 
                 {/* SECCIÓN SUPERIOR: DATOS GENERALES (Compact layout) */}
                 <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100 shadow-sm">

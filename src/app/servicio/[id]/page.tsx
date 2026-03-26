@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Building2, Calendar, LogOut, X, Loader2, FileText, CheckCircle2 } from 'lucide-react';
 import { UnidadesControl } from '@/components/supervisor/UnidadesControl';
@@ -13,6 +13,7 @@ import { agregarServicioExtraordinario, cerrarServicioExtraordinario } from '@/s
 import { ServicioExtraordinario, AperturaServicioExtra, CierreServicioExtra } from '@/types/servicioExtraordinario';
 import { useAuth } from '@/context/AuthContext';
 import { generarInformeTexto } from '@/utils/reporteSupervisor';
+import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
 
 export default function ServicioDashboardPage() {
     const router = useRouter();
@@ -25,16 +26,9 @@ export default function ServicioDashboardPage() {
     const [loading, setLoading] = useState(true);
     const [showCierreModal, setShowCierreModal] = useState(false);
     const [showReporte, setShowReporte] = useState(false);
+    const [notice, setNotice] = useState<InlineAlertData | null>(null);
 
-    useEffect(() => {
-        if (!authLoading && !user) {
-            router.push('/login');
-        } else if (user) {
-            cargarServicio();
-        }
-    }, [authLoading, user, servicioId]);
-
-    const cargarServicio = async () => {
+    const cargarServicio = useCallback(async () => {
         setLoading(true);
         try {
             if (!servicioId) return;
@@ -42,14 +36,14 @@ export default function ServicioDashboardPage() {
             const serv = await getServicioById(servicioId);
 
             if (!serv) {
-                alert('Servicio no encontrado');
+                setNotice({ type: 'error', message: 'Servicio no encontrado.' });
                 router.push('/');
                 return;
             }
 
             // Validar propiedad
             if (serv.uidSupervisor !== user!.uid && !isAdmin) {
-                alert('No tienes permiso para ver este servicio');
+                setNotice({ type: 'error', message: 'No tienes permiso para ver este servicio.' });
                 router.push('/');
                 return;
             }
@@ -59,12 +53,20 @@ export default function ServicioDashboardPage() {
 
         } catch (error) {
             console.error('Error cargando servicio:', error);
-            alert('Error al cargar servicio');
+            setNotice({ type: 'error', message: 'Error al cargar servicio.' });
             router.push('/');
         } finally {
             setLoading(false);
         }
-    };
+    }, [servicioId, router, user, isAdmin]);
+
+    useEffect(() => {
+        if (!authLoading && !user) {
+            router.push('/login');
+        } else if (user) {
+            void cargarServicio();
+        }
+    }, [authLoading, user, router, cargarServicio]);
 
     const handleCerrarServicioClick = () => {
         setShowCierreModal(true);
@@ -95,9 +97,12 @@ export default function ServicioDashboardPage() {
             setServicio(updatedService);
             setShowCierreModal(false);
             setShowReporte(true);
-        } catch (error: any) {
+        } catch (error) {
             console.error(error);
-            alert(`Error al cerrar servicio: ${error.message}`);
+            setNotice({
+                type: 'error',
+                message: `Error al cerrar servicio: ${error instanceof Error ? error.message : 'error desconocido'}`,
+            });
         }
     };
 
@@ -136,7 +141,7 @@ export default function ServicioDashboardPage() {
             {/* Header del Servicio */}
             <div className="bg-white shadow-sm border-b">
                 <div className="max-w-7xl mx-auto px-4 py-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
                                 <button
@@ -166,7 +171,7 @@ export default function ServicioDashboardPage() {
                         {servicioActivo && (
                             <button
                                 onClick={handleCerrarServicioClick}
-                                className="px-6 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-colors shadow-lg flex items-center gap-2"
+                                className="w-full sm:w-auto px-6 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-colors shadow-lg flex items-center justify-center gap-2"
                             >
                                 <LogOut className="w-5 h-5" />
                                 CERRAR SERVICIO 24h
@@ -178,8 +183,8 @@ export default function ServicioDashboardPage() {
 
             {/* Tabs */}
             <div className="bg-white border-b">
-                <div className="max-w-7xl mx-auto px-4">
-                    <div className="flex gap-2">
+                <div className="max-w-7xl mx-auto px-4 overflow-x-auto">
+                    <div className="flex gap-2 min-w-max">
                         <button
                             onClick={() => setActiveTab('instalaciones')}
                             className={`px-6 py-4 font-bold text-sm transition-all relative ${activeTab === 'instalaciones'
@@ -226,12 +231,19 @@ export default function ServicioDashboardPage() {
                         </div>
                     )}
 
+                    {notice && <InlineAlert notice={notice} onClose={() => setNotice(null)} />}
+
                     {activeTab === 'instalaciones' && (
                         <UnidadesControl servicioId={servicio.id!} soloLectura={!servicioActivo} />
                     )}
 
                     {activeTab === 'sextraordinarios' && (
-                        <ServiciosExtraordinariosTab servicio={servicio} servicioActivo={servicioActivo} />
+                        <ServiciosExtraordinariosTab
+                            servicio={servicio}
+                            servicioActivo={servicioActivo}
+                            onDataChanged={cargarServicio}
+                            onNotify={setNotice}
+                        />
                     )}
                 </div>
             </div>
@@ -247,6 +259,8 @@ export default function ServicioDashboardPage() {
 }
 
 function ReporteView({ servicio, onVolver }: { servicio: ServicioSupervisor; onVolver: () => void }) {
+    const [notice, setNotice] = useState<InlineAlertData | null>(null);
+
     // Generate simple text report for copy/paste
     const generarTextoReporte = () => {
         // Si ya existe un informe guardado, usarlo.
@@ -262,9 +276,13 @@ Por favor, consulte los detalles en el dashboard.
         `;
     };
 
-    const copiarPortapapeles = () => {
-        navigator.clipboard.writeText(generarTextoReporte());
-        alert("Reporte copiado al portapapeles");
+    const copiarPortapapeles = async () => {
+        try {
+            await navigator.clipboard.writeText(generarTextoReporte());
+            setNotice({ type: 'success', message: 'Reporte copiado al portapapeles.' });
+        } catch {
+            setNotice({ type: 'error', message: 'No se pudo copiar el reporte.' });
+        }
     };
 
     return (
@@ -280,6 +298,8 @@ Por favor, consulte los detalles en el dashboard.
 
                 <div className="p-6 flex-1 overflow-y-auto">
                     <div className="space-y-6">
+                        {notice && <InlineAlert notice={notice} onClose={() => setNotice(null)} />}
+
                         <div className="grid grid-cols-2 gap-4 text-center">
                             <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
                                 <span className="block text-gray-500 text-xs uppercase tracking-wider font-bold">Total Casos</span>
@@ -307,7 +327,7 @@ Por favor, consulte los detalles en el dashboard.
                     </div>
                 </div>
 
-                <div className="p-6 border-t bg-gray-50 flex gap-3">
+                <div className="p-6 border-t bg-gray-50 flex flex-col sm:flex-row gap-3">
                     <button onClick={onVolver} className="flex-1 py-3 px-4 border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-100 transition-colors">
                         Volver al Inicio
                     </button>
@@ -321,7 +341,17 @@ Por favor, consulte los detalles en el dashboard.
 }
 
 // Componente auxiliar para el tab de S.Extraordinarios
-function ServiciosExtraordinariosTab({ servicio, servicioActivo }: { servicio: ServicioSupervisor; servicioActivo: boolean }) {
+function ServiciosExtraordinariosTab({
+    servicio,
+    servicioActivo,
+    onDataChanged,
+    onNotify,
+}: {
+    servicio: ServicioSupervisor;
+    servicioActivo: boolean;
+    onDataChanged: () => Promise<void>;
+    onNotify: (notice: InlineAlertData | null) => void;
+}) {
     const [showAperturaForm, setShowAperturaForm] = useState(false);
     const [showCierreForm, setShowCierreForm] = useState(false);
     const [servicioSeleccionado, setServicioSeleccionado] = useState<ServicioExtraordinario | null>(null);
@@ -334,11 +364,14 @@ function ServiciosExtraordinariosTab({ servicio, servicioActivo }: { servicio: S
         try {
             await agregarServicioExtraordinario(servicio.id!, data);
             setShowAperturaForm(false);
-            alert('✅ Servicio extraordinario abierto correctamente');
-            window.location.reload(); // Recargar para ver cambios
-        } catch (error: any) {
+            await onDataChanged();
+            onNotify({ type: 'success', message: 'Servicio extraordinario abierto correctamente.' });
+        } catch (error) {
             console.error(error);
-            alert(`❌ Error al abrir servicio: ${error.message}`);
+            onNotify({
+                type: 'error',
+                message: `Error al abrir servicio: ${error instanceof Error ? error.message : 'error desconocido'}`,
+            });
         }
     };
 
@@ -357,11 +390,14 @@ function ServiciosExtraordinariosTab({ servicio, servicioActivo }: { servicio: S
             await cerrarServicioExtraordinario(servicio.id!, servicioSeleccionado.id, data);
             setShowCierreForm(false);
             setServicioSeleccionado(null);
-            alert('✅ Servicio extraordinario cerrado correctamente');
-            window.location.reload(); // Recargar para ver cambios
-        } catch (error: any) {
+            await onDataChanged();
+            onNotify({ type: 'success', message: 'Servicio extraordinario cerrado correctamente.' });
+        } catch (error) {
             console.error(error);
-            alert(`❌ Error al cerrar servicio: ${error.message}`);
+            onNotify({
+                type: 'error',
+                message: `Error al cerrar servicio: ${error instanceof Error ? error.message : 'error desconocido'}`,
+            });
         }
     };
 
@@ -372,7 +408,7 @@ function ServiciosExtraordinariosTab({ servicio, servicioActivo }: { servicio: S
                 soloLectura={!servicioActivo}
                 onAbrirNuevo={handleAbrirNuevo}
                 onCerrarServicio={handleCerrarServicio}
-                onVerDetalle={(id) => alert('Ver detalle: ' + id)}
+                onVerDetalle={(id) => onNotify({ type: 'info', message: `Detalle solicitado para: ${id}` })}
             />
 
             {showAperturaForm && (

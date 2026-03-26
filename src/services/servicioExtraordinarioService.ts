@@ -1,7 +1,7 @@
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, arrayUnion, Timestamp } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, Timestamp, runTransaction } from 'firebase/firestore';
 import { ServicioExtraordinario, AperturaServicioExtra, CierreServicioExtra } from '@/types/servicioExtraordinario';
-import { getServicioById } from './servicioSupervisorService';
+import { withFirestoreRetry } from '@/lib/firestoreRetry';
 
 /**
  * Agregar un nuevo servicio extraordinario al servicio supervisor activo
@@ -42,30 +42,33 @@ export async function cerrarServicioExtraordinario(
     servicioExtraId: string,
     cierre: CierreServicioExtra
 ): Promise<void> {
-    // Obtener servicio actual
-    const servicio = await getServicioById(servicioSupervisorId);
-    if (!servicio || servicio.id !== servicioSupervisorId) {
-        throw new Error('Servicio supervisor no encontrado');
-    }
-
-    // Actualizar el servicio extraordinario específico
-    const serviciosActualizados = servicio.serviciosExtraordinarios.map((s: ServicioExtraordinario) => {
-        if (s.id === servicioExtraId) {
-            return {
-                ...s,
-                estado: 'cerrado' as const,
-                cierre: {
-                    ...cierre,
-                    fechaCierre: Timestamp.fromDate(cierre.fechaCierre)
-                }
-            };
-        }
-        return s;
-    });
-
     const docRef = doc(db, 'servicios_supervisor', servicioSupervisorId);
 
-    await updateDoc(docRef, {
-        serviciosExtraordinarios: serviciosActualizados
+    await withFirestoreRetry(async () => {
+        await runTransaction(db, async (tx) => {
+            const snap = await tx.get(docRef);
+            if (!snap.exists()) {
+                throw new Error('Servicio supervisor no encontrado');
+            }
+
+            const servicio = snap.data();
+            const serviciosActualizados = (servicio.serviciosExtraordinarios || []).map((s: ServicioExtraordinario) => {
+                if (s.id === servicioExtraId) {
+                    return {
+                        ...s,
+                        estado: 'cerrado' as const,
+                        cierre: {
+                            ...cierre,
+                            fechaCierre: Timestamp.fromDate(cierre.fechaCierre)
+                        }
+                    };
+                }
+                return s;
+            });
+
+            tx.update(docRef, {
+                serviciosExtraordinarios: serviciosActualizados
+            });
+        });
     });
 }

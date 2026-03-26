@@ -1,6 +1,6 @@
-import { db, auth, firebaseConfig } from '@/lib/firebase';
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import { initializeApp, deleteApp, getApp, getApps } from 'firebase/app';
+import { db, firebaseConfig } from '@/lib/firebase';
+import { doc, getDoc, setDoc, collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { initializeApp, deleteApp, getApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 
 export type UserRole = 'admin' | 'supervisor';

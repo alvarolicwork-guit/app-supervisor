@@ -6,13 +6,16 @@ import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { Shield, Key, Mail, Loader2, AlertTriangle, X } from 'lucide-react';
 import { userService } from '@/services/userService';
+import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [notice, setNotice] = useState<InlineAlertData | null>(null);
     const router = useRouter();
+    const allowDevAdminSetup = process.env.NEXT_PUBLIC_ENABLE_DEV_ADMIN_SETUP === 'true' && process.env.NODE_ENV !== 'production';
 
     // Dev Modal State
     const [showDevModal, setShowDevModal] = useState(false);
@@ -47,13 +50,18 @@ export default function LoginPage() {
     const handleFirstAdminSetup = async (e: React.FormEvent) => {
         e.preventDefault();
 
+        if (!allowDevAdminSetup) {
+            setError('La configuración inicial está deshabilitada en este entorno.');
+            return;
+        }
+
         if (!devEmail || !devPass) {
-            alert('Completa ambos campos');
+            setNotice({ type: 'error', message: 'Completa ambos campos.' });
             return;
         }
 
         if (devPass.length < 6) {
-            alert('La contraseña debe tener al menos 6 caracteres');
+            setNotice({ type: 'error', message: 'La contraseña debe tener al menos 6 caracteres.' });
             return;
         }
 
@@ -73,12 +81,15 @@ export default function LoginPage() {
                 createdAt: new Date()
             });
 
-            alert('✅ Usuario Administrador creado exitosamente. Ahora inicia sesión.');
+            setNotice({ type: 'success', message: 'Usuario administrador creado exitosamente. Ahora inicia sesión.' });
             setEmail(devEmail);
             setPassword('');
             setShowDevModal(false);
-        } catch (error: any) {
-            alert('❌ Error: ' + error.message);
+        } catch (error) {
+            setNotice({
+                type: 'error',
+                message: `Error al crear administrador: ${error instanceof Error ? error.message : 'error desconocido'}`,
+            });
         } finally {
             setLoading(false);
         }
@@ -106,6 +117,8 @@ export default function LoginPage() {
                             <p className="text-sm text-red-200">{error}</p>
                         </div>
                     )}
+
+                    {notice && <InlineAlert notice={notice} onClose={() => setNotice(null)} />}
 
                     <form onSubmit={handleLogin} className="space-y-4">
                         <div className="space-y-2">
@@ -151,20 +164,21 @@ export default function LoginPage() {
                         </button>
                     </form>
 
-                    {/* Developer Tool for First Admin */}
-                    <div className="mt-8 pt-6 border-t border-white/5 text-center">
-                        <button
-                            onClick={() => setShowDevModal(true)}
-                            className="text-xs text-slate-600 hover:text-slate-400 transition-colors underline cursor-pointer"
-                        >
-                            ¿Configuración inicial? (Dev Only)
-                        </button>
-                    </div>
+                    {allowDevAdminSetup && (
+                        <div className="mt-8 pt-6 border-t border-white/5 text-center">
+                            <button
+                                onClick={() => setShowDevModal(true)}
+                                className="text-xs text-slate-600 hover:text-slate-400 transition-colors underline cursor-pointer"
+                            >
+                                ¿Configuración inicial? (Solo desarrollo)
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
             {/* DEV SETUP MODAL */}
-            {showDevModal && (
+            {allowDevAdminSetup && showDevModal && (
                 <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-sm shadow-2xl animate-in zoom-in-95">
                         <div className="flex justify-between items-center mb-4">
@@ -187,7 +201,7 @@ export default function LoginPage() {
                             <div>
                                 <label className="block text-xs font-bold text-slate-400 mb-1">Password</label>
                                 <input
-                                    type="text"
+                                    type="password"
                                     required
                                     value={devPass}
                                     onChange={e => setDevPass(e.target.value)}

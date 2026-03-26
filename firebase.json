@@ -1,8 +1,15 @@
-﻿{
+{
+  "functions": {
+    "source": "functions"
+  },
   "hosting": {
     "source": ".",
     "public": "public",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "frameworksBackend": {}
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
   }
 }

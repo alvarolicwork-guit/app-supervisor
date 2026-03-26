@@ -1,24 +1,6 @@
 {
     "indexes": [
         {
-            "collectionGroup": "servicios_supervisor",
-            "queryScope": "COLLECTION",
-            "fields": [
-                {
-                    "fieldPath": "estado",
-                    "order": "ASCENDING"
-                },
-                {
-                    "fieldPath": "apertura.supervisorActual.nombreCompleto",
-                    "order": "ASCENDING"
-                },
-                {
-                    "fieldPath": "createdAt",
-                    "order": "DESCENDING"
-                }
-            ]
-        },
-        {
             "collectionGroup": "users",
             "queryScope": "COLLECTION",
             "fields": [
@@ -61,6 +43,66 @@
                 {
                     "fieldPath": "createdAt",
                     "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "servicios_supervisor",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "estado",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "expiresAt",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "servicios_jefe_operativo",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "estado",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "uidJefe",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "servicios_jefe_operativo",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "uidJefe",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "servicios_jefe_operativo",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "estado",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "expiresAt",
+                    "order": "ASCENDING"
                 }
             ]
         }

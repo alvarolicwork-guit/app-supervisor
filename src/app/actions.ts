@@ -19,40 +19,44 @@ export async function mejorarTextoAction(texto: string, contexto?: string) {
     }
 }
 
-import { generateContentDirect } from '@/ai/geminiDirect';
-
-// ... (codigo anterior) ...
-
 export async function extraerDatosCasoAction(textoReporte: string) {
-    console.log("Server Action (Direct): Procesando texto:", textoReporte.substring(0, 30));
+    try {
+        return await extraerDatosCasoFlow({ textoReporte });
+    } catch (error) {
+        throw new Error(`Falló la extracción del caso: ${error instanceof Error ? error.message : 'error desconocido'}`);
+    }
+}
 
-    const prompt = `
-      Eres un asistente experto en reportes policiales. Analiza este texto:
-      "${textoReporte}"
-      
-      Extrae en JSON:
-      {
-        "tipo": "String (ej. Robo, Riña)",
-        "hora": "String (HH:mm)",
-        "lugar": "String",
-        "encargado": "String",
-        "detalle": "String (Resumen formal)"
-      }
-      SOLO JSON.
-    `;
+export async function transformarTareasPasadoAction(texto: string) {
+    const base = texto.trim();
+    if (!base) return '';
 
     try {
-        const rawText = await generateContentDirect(prompt);
-        console.log("Gemini Raw:", rawText);
+        const resultado = await mejorarRedaccionFlow({
+            textoBase: base,
+            tipo: 'informe',
+            contexto: 'Reescribe exclusivamente en tiempo pasado, manteniendo el mismo significado. No agregues datos nuevos, no elimines datos, no cambies nombres propios ni cifras. Devuelve solo el texto final.',
+        });
 
-        // Parsing robusto
-        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error("No se encontró JSON en la respuesta");
+        return resultado.textoMejorado.trim();
+    } catch {
+        return base;
+    }
+}
 
-        return JSON.parse(jsonMatch[0]);
+export async function generarInformeInstitucionalIAAction(borrador: string) {
+    const base = borrador.trim();
+    if (!base) return '';
 
-    } catch (error: any) {
-        console.error('CRITICAL ERROR Gemini Direct:', error);
-        throw new Error(`Falló la extracción (Directo): ${error.message}`);
+    try {
+        const resultado = await mejorarRedaccionFlow({
+            textoBase: base,
+            tipo: 'informe',
+            contexto: 'Reescribe este borrador como informe institucional policial en tiempo pasado, manteniendo todos los datos, nombres, horas y cifras exactamente como estan. No inventes informacion ni elimines secciones. Devuelve solo el texto final.',
+        });
+
+        return resultado.textoMejorado.trim();
+    } catch {
+        return base;
     }
 }

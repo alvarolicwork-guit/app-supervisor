@@ -19,10 +19,17 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const isLocalDev = process.env.NODE_ENV !== "production";
+
   return (
     <html lang="es" className={`${inter.variable} ${sourceCodePro.variable}`} suppressHydrationWarning>
       <body suppressHydrationWarning>
         <AuthProvider>
+          {isLocalDev && (
+            <div className="fixed right-3 top-3 z-[9999] rounded-md bg-emerald-600 px-2 py-1 text-[10px] font-bold tracking-wide text-white shadow-lg">
+              LOCAL DEV
+            </div>
+          )}
           <main>{children}</main>
         </AuthProvider>
       </body>

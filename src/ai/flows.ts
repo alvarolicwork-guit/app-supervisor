@@ -1,8 +1,8 @@
 import { genkit, z } from 'genkit';
 import { googleAI } from '@genkit-ai/googleai';
 
-// Configurar Genkit con Google AI
 const apiKey = process.env.GOOGLE_AI_API_KEY;
+const model = process.env.GENKIT_MODEL || 'googleai/gemini-2.0-flash';
 
 if (!apiKey) {
   throw new Error('❌ GOOGLE_AI_API_KEY no está configurada. Crea un archivo .env.local con tu API key.');
@@ -10,10 +10,9 @@ if (!apiKey) {
 
 const ai = genkit({
   plugins: [googleAI({ apiKey })],
-  model: 'gemini-pro',
+  model,
 });
 
-// Definir esquema de entrada y salida
 const RedaccionInput = z.object({
   textoBase: z.string(),
   tipo: z.enum(['novedad', 'informe', 'parte']).optional(),
@@ -25,7 +24,31 @@ const RedaccionOutput = z.object({
   resumen: z.string(),
 });
 
-// Flujo: Mejorar Redacción Policial
+const ExtraccionCasoInput = z.object({
+  textoReporte: z.string(),
+});
+
+const ExtraccionCasoOutput = z.object({
+  tipo: z.string().describe('Tipo de caso, ej: Auxilio, Robo, Rina, etc.'),
+  hora: z.string().describe('Hora aproximada del hecho formato 24h (HH:mm)'),
+  lugar: z.string().optional(),
+  encargado: z.string().optional(),
+  detalle: z.string().describe('Redaccion formal y resumida del hecho'),
+});
+
+function extractFirstJsonObject(text: string): unknown {
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) {
+    throw new Error('La respuesta de IA no contiene JSON valido.');
+  }
+  return JSON.parse(match[0]);
+}
+
+function safeSnippet(value: string, max = 160): string {
+  const compact = value.replace(/\s+/g, ' ').trim();
+  return compact.length > max ? `${compact.slice(0, max)}...` : compact;
+}
+
 export const mejorarRedaccionFlow = ai.defineFlow(
   {
     name: 'mejorarRedaccion',
@@ -50,46 +73,30 @@ export const mejorarRedaccionFlow = ai.defineFlow(
       4. Corrige ortografía y gramática.
       5. Si faltan datos clave (hora, lugar), déjalos indicados entre corchetes [HORA?].
 
-      Genera también un resumen de una línea para el parte diario.
+      Devuelve SOLO un JSON valido con esta estructura exacta:
+      {
+        "textoMejorado": "string",
+        "resumen": "string"
+      }
     `;
 
     const response = await ai.generate(prompt);
-
-    // Extracción robusta (aunque Genkit suele dar texto directo, estructuramos la respuesta)
-    // Para simplificar en este paso, asumimos que el modelo sigue instrucciones. 
-    // En producción idealmente usamos output estructurado nativo (json mode).
-
-    const text = response.text;
-    const [cuerpo, resumen] = text.split('RESUMEN:');
-
-    return {
-      textoMejorado: cuerpo ? cuerpo.trim() : text,
-      resumen: resumen ? resumen.trim() : 'Resumen no generado automáticamente.',
-    };
+    const parsed = extractFirstJsonObject(response.text);
+    return RedaccionOutput.parse(parsed);
   }
 );
-
-// --- Nuevo Flujo: Extracción de Datos de Casos (WhatsApp -> JSON) ---
-
-const ExtraccionCasoInput = z.object({
-  textoReporte: z.string(),
-});
-
-const ExtraccionCasoOutput = z.object({
-  tipo: z.string().describe('Tipo de caso, ej: Auxilio, Robo, Rina, etc.'),
-  hora: z.string().describe('Hora aproximada del hecho formato 24h'),
-  detalle: z.string().describe('Redacción formal y resumida del hecho'),
-  lugar: z.string().optional(),
-});
 
 export const extraerDatosCasoFlow = ai.defineFlow(
   {
     name: 'extraerDatosCaso',
     inputSchema: ExtraccionCasoInput,
-    outputSchema: z.unknown(), // Desactivamos validación estricta temporalmente
+    outputSchema: ExtraccionCasoOutput,
   },
   async (input) => {
-    console.log('DEBUG_ANTIGRAVITY: Iniciando flujo con texto:', input.textoReporte.substring(0, 50) + '...');
+    if (!input.textoReporte.trim()) {
+      throw new Error('No se recibio texto para extraer datos del caso.');
+    }
+
     const prompt = `
       Eres un asistente experto en análisis de reportes policiales.
       Tu tarea es leer el siguiente reporte crudo (posiblemente copiado de WhatsApp) y extraer los datos clave para el sistema.
@@ -118,29 +125,15 @@ export const extraerDatosCasoFlow = ai.defineFlow(
 
     try {
       const response = await ai.generate({
-        prompt: prompt,
+        prompt,
         config: {
-          temperature: 0.1, // Baja temperatura para más determinismo
-        }
+          temperature: 0.1,
+        },
       });
-      const text = response.text;
-      console.log('DEBUG_ANTIGRAVITY: Respuesta Raw Genkit:', text);
-
-      // Extracción robusta de JSON: busca el primer '{' y el último '}'
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-
-      if (!jsonMatch) {
-        console.error('DEBUG_ANTIGRAVITY: No JSON match found in:', text);
-        throw new Error('La respuesta de la IA no contiene un JSON válido.');
-      }
-
-      const parsed = JSON.parse(jsonMatch[0]);
-      console.log('DEBUG_ANTIGRAVITY: JSON Parsed ok:', parsed);
-      return parsed;
-
+      const parsed = extractFirstJsonObject(response.text);
+      return ExtraccionCasoOutput.parse(parsed);
     } catch (e) {
-      console.error('DEBUG_ANTIGRAVITY: Error en flujo:', e);
-      throw e;
+      throw new Error(`Fallo al extraer datos del caso: ${safeSnippet(String(e))}`);
     }
   }
 );

@@ -1,5 +1,6 @@
 import { db } from '@/lib/firebase';
-import { collection, addDoc, updateDoc, doc, getDocs, query, where, orderBy, serverTimestamp, Timestamp, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, getDocs, query, where, orderBy, serverTimestamp, Timestamp, deleteDoc, runTransaction, getDoc } from 'firebase/firestore';
+import { withFirestoreRetry } from '@/lib/firestoreRetry';
 
 // Tipos
 export interface SupervisorInfo {
@@ -211,21 +212,18 @@ export async function deleteServicio(servicioId: string): Promise<void> {
 export async function agregarControlInstalacion(servicioId: string, registro: any): Promise<void> {
     const docRef = doc(db, 'servicios_supervisor', servicioId);
 
-    // Primero obtenemos el doc actual para hacer append al array
-    // (En un entorno real de alta concurrencia usaríamos arrayUnion, pero aquí queremos orden específico tal vez? 
-    // arrayUnion no garantiza orden si ya existe, pero para logs nuevos está bien. 
-    // Sin embargo, Firestore no tiene arrayUnion simple para objetos complejos si queremos evitar duplicados exactos 
-    // comportamiento, pero aquí son registros únicos por timestamp.
+    await withFirestoreRetry(async () => {
+        await runTransaction(db, async (tx) => {
+            const snap = await tx.get(docRef);
+            if (!snap.exists()) throw new Error('Servicio no encontrado');
 
-    // Mejor leemos, append y update.
-    const snap = await import('firebase/firestore').then(m => m.getDoc(docRef));
-    if (!snap.exists()) throw new Error("Servicio no encontrado");
+            const currentList = snap.data().controlInstalaciones || [];
+            const nuevosRegistros = [...currentList, registro];
 
-    const currentList = snap.data().controlInstalaciones || [];
-    const nuevosRegistros = [...currentList, registro];
-
-    await updateDoc(docRef, {
-        controlInstalaciones: nuevosRegistros,
+            tx.update(docRef, {
+                controlInstalaciones: nuevosRegistros,
+            });
+        });
     });
 }
 
@@ -245,11 +243,29 @@ export async function limpiarServiciosExpirados(): Promise<void> {
 }
 
 /**
+ * Fallback manual (Spark): elimina servicios cerrados expirados y devuelve total.
+ */
+export async function cleanupExpiredSupervisorServicios(): Promise<number> {
+    const ahora = Timestamp.now();
+    const q = query(
+        collection(db, 'servicios_supervisor'),
+        where('estado', '==', 'cerrado'),
+        where('expiresAt', '<', ahora)
+    );
+
+    const snapshot = await getDocs(q);
+    const deletePromises = snapshot.docs.map((docSnap) => deleteDoc(docSnap.ref));
+    await Promise.all(deletePromises);
+
+    return deletePromises.length;
+}
+
+/**
  * Obtener un servicio específico por ID
  */
 export async function getServicioById(id: string): Promise<ServicioSupervisor | null> {
     const docRef = doc(db, 'servicios_supervisor', id);
-    const snap = await import('firebase/firestore').then(m => m.getDoc(docRef));
+    const snap = await getDoc(docRef);
 
     if (!snap.exists()) return null;
 

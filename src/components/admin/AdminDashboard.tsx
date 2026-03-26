@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { LogOut, Users, Shield, FileText, Plus, Search, Loader2, CheckCircle, X, Eye } from 'lucide-react';
+import { LogOut, Users, Shield, FileText, Plus, Loader2, X, Eye, TriangleAlert, Trash2 } from 'lucide-react';
 import { userService, UserProfile } from '@/services/userService';
-import { getAllServiciosAdmin, ServicioSupervisor } from '@/services/servicioSupervisorService';
+import { cleanupExpiredSupervisorServicios, getAllServiciosAdmin, ServicioSupervisor } from '@/services/servicioSupervisorService';
+import { cleanupExpiredJefeOperativoServicios } from '@/services/jefeOperativoService';
 import { useRouter } from 'next/navigation';
+import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
 
 export function AdminDashboard() {
     const { logout, userProfile } = useAuth();
@@ -16,7 +18,7 @@ export function AdminDashboard() {
         <div className="min-h-screen bg-slate-50">
             {/* Admin Header */}
             <div className="bg-slate-900 text-white shadow-lg sticky top-0 z-10">
-                <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+                <div className="max-w-7xl mx-auto px-4 py-3 md:py-4 space-y-3 md:space-y-0 md:flex md:justify-between md:items-center">
                     <div className="flex items-center gap-3">
                         <div className="bg-blue-600 p-2 rounded-lg">
                             <Shield className="w-6 h-6" />
@@ -28,7 +30,8 @@ export function AdminDashboard() {
                         </div>
                     </div>
 
-                    <div className="flex bg-slate-800 rounded-lg p-1">
+                    <div className="overflow-x-auto">
+                    <div className="flex bg-slate-800 rounded-lg p-1 min-w-max">
                         <button
                             onClick={() => setActiveTab('dashboard')}
                             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'dashboard' ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-white'}`}
@@ -48,8 +51,9 @@ export function AdminDashboard() {
                             Servicios
                         </button>
                     </div>
+                    </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center justify-end gap-3">
                         <div className="text-right hidden md:block">
                             <p className="text-sm font-semibold">{userProfile?.nombreCompleto}</p>
                             <p className="text-xs text-slate-400">Administrador</p>
@@ -66,7 +70,7 @@ export function AdminDashboard() {
             </div>
 
             {/* Content */}
-            <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="max-w-7xl mx-auto px-4 py-6 md:py-8">
                 {activeTab === 'dashboard' && <ResumenTab onChangeTab={setActiveTab} />}
                 {activeTab === 'usuarios' && <UsuariosTab />}
                 {activeTab === 'servicios' && <ServiciosTab router={router} />}
@@ -77,7 +81,7 @@ export function AdminDashboard() {
 
 // --- SUB COMPONENTS ---
 
-function ResumenTab({ onChangeTab }: { onChangeTab: (tab: any) => void }) {
+function ResumenTab({ onChangeTab }: { onChangeTab: (tab: 'dashboard' | 'usuarios' | 'servicios') => void }) {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-4">
             {/* User Management Card */}
@@ -142,7 +146,7 @@ function UsuariosTab() {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
                 <h2 className="text-2xl font-bold text-slate-800">Supervisores Registrados</h2>
                 <button
                     onClick={() => setShowForm(true)}
@@ -159,6 +163,7 @@ function UsuariosTab() {
                 </div>
             ) : (
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead className="bg-slate-50 border-b border-slate-200">
                             <tr>
@@ -205,6 +210,7 @@ function UsuariosTab() {
                             )}
                         </tbody>
                     </table>
+                    </div>
                 </div>
             )}
 
@@ -228,6 +234,7 @@ function RegistroUsuarioModal({ onClose, onSuccess }: { onClose: () => void; onS
     const [nombre, setNombre] = useState('');
     const [celular, setCelular] = useState('');
     const [loading, setLoading] = useState(false);
+    const [notice, setNotice] = useState<InlineAlertData | null>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -238,11 +245,14 @@ function RegistroUsuarioModal({ onClose, onSuccess }: { onClose: () => void; onS
                 nombreCompleto: nombre,
                 celular
             });
-            alert('✅ Usuario creado exitosamente');
+            setNotice({ type: 'success', message: 'Usuario creado exitosamente.' });
             onSuccess();
-        } catch (error: any) {
+        } catch (error) {
             console.error(error);
-            alert('❌ Error al crear usuario: ' + error.message);
+            setNotice({
+                type: 'error',
+                message: `Error al crear usuario: ${error instanceof Error ? error.message : 'error desconocido'}`,
+            });
         } finally {
             setLoading(false);
         }
@@ -256,6 +266,8 @@ function RegistroUsuarioModal({ onClose, onSuccess }: { onClose: () => void; onS
                     <button onClick={onClose} className="hover:bg-blue-700 p-2 rounded-full"><X className="w-5 h-5" /></button>
                 </div>
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    {notice && <InlineAlert notice={notice} onClose={() => setNotice(null)} />}
+
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-bold text-gray-700 mb-1">Grado</label>
@@ -292,10 +304,13 @@ function RegistroUsuarioModal({ onClose, onSuccess }: { onClose: () => void; onS
 }
 
 
-function ServiciosTab({ router }: { router: any }) {
+function ServiciosTab({ router }: { router: ReturnType<typeof useRouter> }) {
     const [servicios, setServicios] = useState<ServicioSupervisor[]>([]);
     const [loading, setLoading] = useState(true);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [notice, setNotice] = useState<InlineAlertData | null>(null);
+    const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+    const [cleaningExpired, setCleaningExpired] = useState(false);
 
     useEffect(() => {
         cargarServicios();
@@ -313,10 +328,6 @@ function ServiciosTab({ router }: { router: any }) {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('⚠️ ¿Estás seguro de eliminar este registro PERMANENTEMENTE?\n\nEsta acción no se puede deshacer.')) {
-            return;
-        }
-
         setDeletingId(id);
         try {
             const { deleteServicio } = await import('@/services/servicioSupervisorService');
@@ -324,18 +335,59 @@ function ServiciosTab({ router }: { router: any }) {
 
             // Actualizar lista localmente
             setServicios(prev => prev.filter(s => s.id !== id));
-            alert('✅ Servicio eliminado correctamente');
-        } catch (error: any) {
+            setNotice({ type: 'success', message: 'Servicio eliminado correctamente.' });
+        } catch (error) {
             console.error(error);
-            alert('❌ Error al eliminar: ' + error.message);
+            setNotice({
+                type: 'error',
+                message: `Error al eliminar: ${error instanceof Error ? error.message : 'error desconocido'}`,
+            });
         } finally {
             setDeletingId(null);
+            setPendingDeleteId(null);
+        }
+    };
+
+    const handleCleanupExpired = async () => {
+        setCleaningExpired(true);
+        try {
+            const [deletedSupervisor, deletedJefe] = await Promise.all([
+                cleanupExpiredSupervisorServicios(),
+                cleanupExpiredJefeOperativoServicios(),
+            ]);
+
+            await cargarServicios();
+
+            setNotice({
+                type: 'success',
+                message: `Limpieza completada. Eliminados: Supervisor ${deletedSupervisor}, Jefe Operativo ${deletedJefe}.`,
+            });
+        } catch (error) {
+            console.error(error);
+            setNotice({
+                type: 'error',
+                message: `No se pudo completar la limpieza: ${error instanceof Error ? error.message : 'error desconocido'}`,
+            });
+        } finally {
+            setCleaningExpired(false);
         }
     };
 
     return (
         <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-slate-800">Servicios Globales</h2>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-2xl font-bold text-slate-800">Servicios Globales</h2>
+                <button
+                    onClick={handleCleanupExpired}
+                    disabled={cleaningExpired}
+                    className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    title="Elimina servicios cerrados vencidos (fallback Spark)"
+                >
+                    {cleaningExpired ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    Limpiar vencidos (9 días)
+                </button>
+            </div>
+            {notice && <InlineAlert notice={notice} onClose={() => setNotice(null)} />}
             {loading ? (
                 <div className="text-center py-12">
                     <Loader2 className="w-8 h-8 animate-spin mx-auto text-blue-500" />
@@ -369,7 +421,7 @@ function ServiciosTab({ router }: { router: any }) {
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    if (servicio.id) handleDelete(servicio.id);
+                                                    if (servicio.id) setPendingDeleteId(servicio.id);
                                                 }}
                                                 disabled={deletingId === servicio.id}
                                                 className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -395,6 +447,32 @@ function ServiciosTab({ router }: { router: any }) {
                             </div>
                         ))
                     )}
+                </div>
+            )}
+
+            {pendingDeleteId && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="w-full max-w-md rounded-2xl bg-white p-5 md:p-6 shadow-xl">
+                        <div className="mb-3 flex items-center gap-2 text-red-700">
+                            <TriangleAlert className="h-5 w-5" />
+                            <h3 className="font-bold">Eliminar registro permanentemente</h3>
+                        </div>
+                        <p className="mb-6 text-sm text-slate-600">Esta acción no se puede deshacer. El registro se eliminará de forma definitiva.</p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setPendingDeleteId(null)}
+                                className="flex-1 rounded-xl border border-slate-300 px-4 py-2 font-medium text-slate-700 hover:bg-slate-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => void handleDelete(pendingDeleteId)}
+                                className="flex-1 rounded-xl bg-red-600 px-4 py-2 font-bold text-white hover:bg-red-700"
+                            >
+                                Eliminar
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { User, Calendar, FileText } from 'lucide-react';
-import { getSupervisorActual, setSupervisorActual, type SupervisorInfo } from '@/services/servicioSupervisorService';
+import { useState } from 'react';
+import { User } from 'lucide-react';
+import { setSupervisorActual, type SupervisorInfo } from '@/services/servicioSupervisorService';
+import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
 
 interface ConfiguracionSupervisorProps {
     onSupervisorSet: (supervisor: SupervisorInfo) => void;
@@ -11,12 +12,13 @@ interface ConfiguracionSupervisorProps {
 export function ConfiguracionSupervisor({ onSupervisorSet }: ConfiguracionSupervisorProps) {
     const [grado, setGrado] = useState('');
     const [nombreCompleto, setNombreCompleto] = useState('');
+    const [notice, setNotice] = useState<InlineAlertData | null>(null);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
         if (!grado.trim() || !nombreCompleto.trim()) {
-            alert('Por favor completa todos los campos');
+            setNotice({ type: 'error', message: 'Por favor completa todos los campos.' });
             return;
         }
 
@@ -41,6 +43,8 @@ export function ConfiguracionSupervisor({ onSupervisorSet }: ConfiguracionSuperv
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
+                    {notice && <InlineAlert notice={notice} onClose={() => setNotice(null)} />}
+
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-2">
                             Grado

@@ -3,9 +3,11 @@
 import { useState } from 'react';
 import { ShieldAlert, Siren } from 'lucide-react';
 import { NovedadForm } from './NovedadForm';
+import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
 
 export function OperativosMOP() {
     const [activePlan, setActivePlan] = useState<string | null>(null);
+    const [notice, setNotice] = useState<InlineAlertData | null>(null);
 
     const PLANES_ACTIVOS = [
         { id: 'CHACHA', nombre: 'Plan Chachapuma', estado: 'En ejecución' },
@@ -15,6 +17,8 @@ export function OperativosMOP() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
+            {notice && <InlineAlert notice={notice} onClose={() => setNotice(null)} />}
+
             <div className="flex items-center gap-3 mb-6">
                 <div className="p-3 bg-red-100 rounded-xl">
                     <ShieldAlert className="w-6 h-6 text-red-700" />
@@ -54,7 +58,7 @@ export function OperativosMOP() {
                                     titulo={`Novedades en ${plan.nombre}`}
                                     tipoEntidad="Operativo Policial"
                                     onSave={() => {
-                                        alert('Novedad de operativo registrada');
+                                        setNotice({ type: 'success', message: 'Novedad de operativo registrada.' });
                                         setActivePlan(null);
                                     }}
                                 />

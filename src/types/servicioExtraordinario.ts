@@ -3,6 +3,7 @@
 
 export interface PersonalNovedad {
     gradoNombre: string;
+    horaIncorporacion?: string;
 }
 
 export interface ObservacionUniforme {
@@ -17,10 +18,6 @@ export interface NovedadesFormacion {
         lista: PersonalNovedad[];
     };
     personalPermiso: {
-        cantidad: number;
-        lista: PersonalNovedad[];
-    };
-    personalAtrasado: {
         cantidad: number;
         lista: PersonalNovedad[];
     };
@@ -39,12 +36,16 @@ export interface CasoRelevante {
 export interface AperturaServicioExtra {
     // Datos del Plan de Operaciones
     nroPlanOperaciones: string;
+    tipoServicio: string;
     personalContemplado: number;
+    motosContempladas?: number;
+    vehiculosContemplados?: number;
     supervisorGeneral: string;
     jefeOperativo: string;
     lugarFormacion: string;
     horaFormacion: string;
     horaInstalacion: string;
+    tareas?: string;
     fechaApertura: Date;
 
     // Novedades de Formación
@@ -54,7 +55,11 @@ export interface AperturaServicioExtra {
 export interface CierreServicioExtra {
     fechaCierre: Date;
     personalFaltoServicio: PersonalNovedad[];  // Heredado de apertura
-    personalAtrasadoServicio: PersonalNovedad[]; // Heredado de apertura + nuevos
+    personalIncorporadoTarde?: PersonalNovedad[];
+    tareasEjecutadas?: string;
+    reporteWhatsappFinal?: string;
+    informeInstitucionalFinal?: string;
+    generatedAt?: Date;
     novedades: {
         tipo: 'sin' | 'con';
         casos?: CasoRelevante[];

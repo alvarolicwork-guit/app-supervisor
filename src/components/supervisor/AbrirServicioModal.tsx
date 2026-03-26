@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Calendar, FileText, User } from 'lucide-react';
+import { X, FileText, User } from 'lucide-react';
 import { abrirServicioSupervisor, type SupervisorInfo } from '@/services/servicioSupervisorService';
 import { useAuth } from '@/context/AuthContext';
+import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
 
 interface AbrirServicioModalProps {
     onClose: () => void;
@@ -21,17 +22,18 @@ export function AbrirServicioModal({ onClose, onServicioCreado }: AbrirServicioM
     const [gradoRelevo, setGradoRelevo] = useState('');
     // const [nombreRelevo, setNombreRelevo] = useState('');
     const [loading, setLoading] = useState(false);
+    const [notice, setNotice] = useState<InlineAlertData | null>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         if (!user || !userProfile) {
-            alert('Error de sesión. Por favor recarga la página.');
+            setNotice({ type: 'error', message: 'Error de sesión. Cierra sesión y vuelve a ingresar.' });
             return;
         }
 
         if (!nroMemorandum.trim() || !gradoRelevo.trim()) {
-            alert('Por favor completa todos los campos');
+            setNotice({ type: 'error', message: 'Por favor completa todos los campos.' });
             return;
         }
 
@@ -59,20 +61,23 @@ export function AbrirServicioModal({ onClose, onServicioCreado }: AbrirServicioM
             );
 
             onServicioCreado(servicioId);
-        } catch (error: any) {
+        } catch (error) {
             console.error(error);
-            alert(`Error al abrir servicio: ${error.message}`);
+            setNotice({
+                type: 'error',
+                message: `Error al abrir servicio: ${error instanceof Error ? error.message : 'error desconocido'}`,
+            });
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-in zoom-in-95 slide-in-from-bottom-4 overflow-hidden">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-2 sm:p-4 backdrop-blur-sm animate-in fade-in">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-in zoom-in-95 slide-in-from-bottom-4 overflow-hidden max-h-[96vh] flex flex-col">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-emerald-800 to-emerald-900 p-6 flex justify-between items-center text-white">
-                    <h2 className="text-xl font-bold flex items-center gap-2">
+                <div className="bg-gradient-to-r from-emerald-800 to-emerald-900 p-4 sm:p-6 flex justify-between items-center text-white">
+                    <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2 pr-2">
                         <FileText className="w-6 h-6" />
                         Abrir Nuevo Turno
                     </h2>
@@ -85,7 +90,9 @@ export function AbrirServicioModal({ onClose, onServicioCreado }: AbrirServicioM
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-6 overflow-y-auto">
+                    {notice && <InlineAlert notice={notice} onClose={() => setNotice(null)} />}
+
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-2">
                             📄 Nº Memorándum de Designación
@@ -140,7 +147,7 @@ export function AbrirServicioModal({ onClose, onServicioCreado }: AbrirServicioM
                         </div>
                     </div>
 
-                    <div className="flex gap-3 pt-2">
+                    <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
                         <button
                             type="button"
                             onClick={onClose}

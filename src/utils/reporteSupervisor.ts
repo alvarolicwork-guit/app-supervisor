@@ -30,9 +30,6 @@ export function generarInformeTexto(
     // 1. Lista General de Unidades Supervisadas
     const listaNombresUnidades = unitsToList(unidades);
 
-    // 2. Detalle de Novedades por Unidad (Solo si existen)
-    let detalleNovedadesUnidades = '';
-
     // Filtrar unidades con novedad real (Personal o Casos Relevantes)
     // Nota: "Sin Novedad" general se omite en el detalle, solo se listan las novedades.
     // Si el usuario quiere EXPLICITAMENTE "Sin Novedad" para cada unidad, el prompt dice:
@@ -44,12 +41,10 @@ export function generarInformeTexto(
 
     const unidadesConNovedadPersonal = unidades.filter(u => u.personal?.estado === 'con');
     const unidadesConCasos = unidades.filter(u => u.servicio?.relevantes && u.servicio.relevantes.length > 0);
-    const unidadesConPenal = unidades.filter(u => u.poblacionPenal); // Penal tiene su propia sección, pero puede tener novedades de personal.
-
     let textoNovedadesPersonal = '';
     if (unidadesConNovedadPersonal.length > 0) {
         textoNovedadesPersonal += 'Novedades del Personal:\n';
-        unidadesConNovedadPersonal.forEach((u, i) => {
+        unidadesConNovedadPersonal.forEach((u) => {
             const d = u.personal.detalles;
             const partes = [];
             if (d.faltantes && d.faltantes.length > 0) partes.push(`Faltaron al servicio: ${d.faltantes.join(', ')}`);
@@ -81,7 +76,7 @@ export function generarInformeTexto(
     let textoServiciosExtra = '';
     if (servicio.serviciosExtraordinarios && servicio.serviciosExtraordinarios.length > 0) {
         servicio.serviciosExtraordinarios.forEach((s: any, index) => {
-            const plan = s.apertura.numPlan || 'S/N';
+            const plan = s.apertura.nroPlanOperaciones || 'S/N';
             const jefe = s.apertura.jefeOperativo
                 ? `${s.apertura.jefeOperativo.grado} ${s.apertura.jefeOperativo.nombreCompleto}`
                 : 'Sin Jefe Operativo';
@@ -101,7 +96,19 @@ export function generarInformeTexto(
                 novedades += `. Resultados: ${s.cierre.novedadesResultados}`;
             }
 
-            textoServiciosExtra += `${index + 1}. Servicio "${s.apertura.nombreServicio}" (Plan de Op. N° ${plan}), a cargo del ${jefe}. Novedades: ${novedades}.\n`;
+            // Incorporaciones (NUEVO)
+            const incorporados = s.apertura.novedadesFormacion?.personalFalto?.lista?.filter((p: any) => p.horaIncorporacion) || [];
+            if (incorporados.length > 0) {
+                const detalleInc = incorporados.map((p: any) => `${p.gradoNombre} (a hrs ${p.horaIncorporacion})`).join(', ');
+                novedades += `. Incorporaciones: ${detalleInc}`;
+            }
+
+            const efectivos = s.apertura.personalContemplado;
+            const motos = s.apertura.motosContempladas || 0;
+            const vehiculos = s.apertura.vehiculosContemplados || 0;
+            const tareasTexto = s.apertura.tareas ? `. Tareas: ${s.apertura.tareas}` : '';
+ 
+            textoServiciosExtra += `${index + 1}. Servicio "${s.apertura.tipoServicio}" (Plan N° ${plan}), con ${efectivos} efectivos, ${motos} motos y ${vehiculos} veh., a cargo del ${jefe}. Novedades: ${novedades}${tareasTexto}.\n`;
         });
     } else {
         textoServiciosExtra = 'Sin servicios extraordinarios registrados.\n';

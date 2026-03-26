@@ -1,6 +1,6 @@
 'use client';
 
-import { Activity, AlertTriangle, CheckCircle2, ClipboardList, Users, UserX, AlertOctagon } from 'lucide-react';
+import { Activity, CheckCircle2, ClipboardList, Users, UserX, AlertOctagon } from 'lucide-react';
 
 export interface DatosUnidadRegistrada {
     unidad: string;

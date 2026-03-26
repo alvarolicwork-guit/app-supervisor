@@ -1,4 +1,4 @@
-export async function generateContentDirect(prompt: string) {
+export async function generateContentDirect(prompt: string, fileData?: { base64: string, mimeType: string }) {
     const API_KEY = process.env.GOOGLE_AI_API_KEY;
 
     if (!API_KEY) {
@@ -7,15 +7,24 @@ export async function generateContentDirect(prompt: string) {
     // Modelos disponibles confirmados en el entorno del usuario (Dec 2025)
     const MODELS_TO_TRY = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-pro-latest'];
 
-    let lastError = null;
-
     for (const model of MODELS_TO_TRY) {
         try {
             console.log(`DirectGemini: Intentando con modelo '${model}'...`);
             const URL = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`;
 
+            const parts: any[] = [{ text: prompt }];
+
+            if (fileData) {
+                parts.unshift({
+                    inlineData: {
+                        mimeType: fileData.mimeType,
+                        data: fileData.base64
+                    }
+                });
+            }
+
             const payload = {
-                contents: [{ parts: [{ text: prompt }] }]
+                contents: [{ parts }]
             };
 
             const response = await fetch(URL, {
@@ -36,8 +45,7 @@ export async function generateContentDirect(prompt: string) {
 
             return text; // ¡Éxito!
 
-        } catch (e) {
-            lastError = e;
+        } catch {
             // Continuar con el siguiente modelo
         }
     }

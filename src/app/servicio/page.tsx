@@ -9,8 +9,11 @@ import { OperativosMOP } from '@/components/supervisor/OperativosMOP';
 import { CierreTurnoModal } from '@/components/supervisor/CierreTurnoModal';
 import { getServicioActivo, cerrarServicioSupervisor, ServicioSupervisor } from '@/services/servicioSupervisorService';
 import { LogOut, FileText, CheckCircle2 } from 'lucide-react';
+import { DatosUnidadRegistrada } from '@/components/supervisor/ResumenTurno';
+import { ServicioExtraordinario } from '@/types/servicioExtraordinario';
 
 import { useAuth } from '@/context/AuthContext';
+import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
 
 export default function ServicioPage() {
   const { user, loading: authLoading } = useAuth();
@@ -20,6 +23,7 @@ export default function ServicioPage() {
   const [loading, setLoading] = useState(true);
   const [showCierreModal, setShowCierreModal] = useState(false);
   const [showReporte, setShowReporte] = useState(false);
+  const [notice, setNotice] = useState<InlineAlertData | null>(null);
 
   useEffect(() => {
     if (!authLoading) {
@@ -66,7 +70,7 @@ export default function ServicioPage() {
       setShowReporte(true);
     } catch (error) {
       console.error("Error closing service:", error);
-      alert("Error al cerrar el turno. Intente nuevamente.");
+      setNotice({ type: 'error', message: 'Error al cerrar el turno. Intente nuevamente.' });
     }
   };
 
@@ -80,7 +84,7 @@ export default function ServicioPage() {
 
   if (showReporte && servicioData) {
     return (
-      <ReporteView servicio={servicioData} onVolver={() => window.location.reload()} />
+      <ReporteView servicio={servicioData} onVolver={() => window.location.assign('/')} />
     );
   }
 
@@ -121,6 +125,8 @@ export default function ServicioPage() {
         </header>
 
         <div className="max-w-5xl mx-auto space-y-6">
+          {notice && <InlineAlert notice={notice} onClose={() => setNotice(null)} />}
+
           {activeTab === 'resumen' && <PanelResumen />}
           <div className={activeTab === 'unidades' ? 'block' : 'hidden'}>
             {servicioId ? (
@@ -176,6 +182,8 @@ function PanelResumen() {
 }
 
 function ReporteView({ servicio, onVolver }: { servicio: ServicioSupervisor; onVolver: () => void }) {
+  const [notice, setNotice] = useState<InlineAlertData | null>(null);
+
   // Generate simple text report for copy/paste
   const generarTextoReporte = () => {
     let texto = `REPORTE DE SERVICIO DE SUPERVISOR\n`;
@@ -189,9 +197,10 @@ function ReporteView({ servicio, onVolver }: { servicio: ServicioSupervisor; onV
     texto += `- Casos Relevantes: ${servicio.cierre?.casosRelevantes || 0}\n\n`;
 
     texto += `CONTROL DE UNIDADES (${servicio.controlInstalaciones?.length || 0})\n`;
-    servicio.controlInstalaciones?.forEach((u: any, i: number) => {
-      texto += `${i + 1}. ${u.unidad}: ${u.novedades ? 'Con Novedad' : 'Sin Novedad'}\n`;
-      if (u.novedades) texto += `   Detalle: ${u.descripcionNovedad}\n`;
+    servicio.controlInstalaciones?.forEach((u: DatosUnidadRegistrada, i: number) => {
+      const tieneNovedad = (u.servicio?.relevantes?.length || 0) > 0;
+      texto += `${i + 1}. ${u.unidad}: ${tieneNovedad ? 'Con Novedad' : 'Sin Novedad'}\n`;
+      if (tieneNovedad && u.novedadesTexto) texto += `   Detalle: ${u.novedadesTexto}\n`;
     });
     texto += `\n`;
 
@@ -200,17 +209,21 @@ function ReporteView({ servicio, onVolver }: { servicio: ServicioSupervisor; onV
     if (!servicio.serviciosExtraordinarios || servicio.serviciosExtraordinarios.length === 0) {
       texto += `Sin servicios extraordinarios registrados.\n`;
     } else {
-      servicio.serviciosExtraordinarios.forEach((s: any, i: number) => {
-        texto += `${i + 1}. ${s.nombreEvent || 'Evento'}\n`;
+      servicio.serviciosExtraordinarios.forEach((s: ServicioExtraordinario, i: number) => {
+        texto += `${i + 1}. ${s.apertura.tipoServicio || 'Evento'}\n`;
       });
     }
 
     return texto;
   };
 
-  const copiarPortapapeles = () => {
-    navigator.clipboard.writeText(generarTextoReporte());
-    alert("Reporte copiado al portapapeles");
+  const copiarPortapapeles = async () => {
+    try {
+      await navigator.clipboard.writeText(generarTextoReporte());
+      setNotice({ type: 'success', message: 'Reporte copiado al portapapeles.' });
+    } catch {
+      setNotice({ type: 'error', message: 'No se pudo copiar el reporte.' });
+    }
   };
 
   return (
@@ -226,6 +239,8 @@ function ReporteView({ servicio, onVolver }: { servicio: ServicioSupervisor; onV
 
         <div className="p-6 flex-1 overflow-y-auto">
           <div className="space-y-6">
+            {notice && <InlineAlert notice={notice} onClose={() => setNotice(null)} />}
+
             <div className="grid grid-cols-2 gap-4 text-center">
               <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
                 <span className="block text-gray-500 text-xs uppercase tracking-wider font-bold">Total Casos</span>

@@ -1,0 +1,126 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function hasUserDoc() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function userData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return hasUserDoc()
+        && userData().role == 'admin'
+        && userData().isActive == true;
+    }
+
+    function isSupervisor() {
+      return hasUserDoc()
+        && userData().role == 'supervisor'
+        && userData().isActive == true;
+    }
+
+    function isAllowedRole(role) {
+      return role in ['admin', 'supervisor'];
+    }
+
+    function isValidUserCreate(userId) {
+      return request.resource.data.keys().hasAll(['uid', 'email', 'role', 'isActive', 'createdAt'])
+        && request.resource.data.uid == userId
+        && request.resource.data.email is string
+        && isAllowedRole(request.resource.data.role)
+        && request.resource.data.isActive is bool
+        && request.resource.data.createdAt is timestamp;
+    }
+
+    function isValidUserUpdate(userId) {
+      return request.resource.data.uid == resource.data.uid
+        && request.resource.data.uid == userId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.email is string
+        && isAllowedRole(request.resource.data.role)
+        && request.resource.data.isActive is bool;
+    }
+
+    function isValidServicioSupervisorCreate() {
+      return request.resource.data.keys().hasAll([
+          'uidSupervisor',
+          'estado',
+          'apertura',
+          'controlInstalaciones',
+          'serviciosExtraordinarios',
+          'createdAt',
+          'expiresAt'
+        ])
+        && request.resource.data.uidSupervisor == request.auth.uid
+        && request.resource.data.estado == 'abierto'
+        && request.resource.data.apertura is map
+        && request.resource.data.controlInstalaciones is list
+        && request.resource.data.serviciosExtraordinarios is list
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.expiresAt is timestamp;
+    }
+
+    function isValidServicioSupervisorUpdate() {
+      return request.resource.data.uidSupervisor == resource.data.uidSupervisor
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.apertura == resource.data.apertura;
+    }
+
+    function isValidServicioJefeCreate() {
+      return request.resource.data.keys().hasAll([
+          'uidJefe',
+          'estado',
+          'apertura',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.uidJefe == request.auth.uid
+        && request.resource.data.estado == 'abierto'
+        && request.resource.data.apertura is map
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
+    }
+
+    function isValidServicioJefeUpdate() {
+      return request.resource.data.uidJefe == resource.data.uidJefe
+        && request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    match /users/{userId} {
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+      allow create: if isAdmin() && isValidUserCreate(userId);
+      allow update: if isAdmin() && isValidUserUpdate(userId);
+      allow delete: if isAdmin();
+    }
+
+    match /servicios_supervisor/{servicioId} {
+      allow read: if isAdmin() || (isSupervisor() && request.auth.uid == resource.data.uidSupervisor);
+      allow create: if isSupervisor()
+        && isValidServicioSupervisorCreate();
+      allow update: if (isAdmin() || (isSupervisor() && request.auth.uid == resource.data.uidSupervisor))
+        && isValidServicioSupervisorUpdate();
+      allow delete: if isAdmin();
+    }
+
+    match /servicios_jefe_operativo/{servicioId} {
+      allow read: if isAdmin() || (isSupervisor() && request.auth.uid == resource.data.uidJefe);
+      allow create: if isSupervisor()
+        && isValidServicioJefeCreate();
+      allow update: if (isAdmin() || (isSupervisor() && request.auth.uid == resource.data.uidJefe))
+        && isValidServicioJefeUpdate();
+      allow delete: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -3,12 +3,16 @@
 import { useState } from 'react';
 import { Calendar, Users } from 'lucide-react';
 import { NovedadForm } from './NovedadForm';
+import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
 
 export function ServiciosExtra() {
     const [showForm, setShowForm] = useState(false);
+    const [notice, setNotice] = useState<InlineAlertData | null>(null);
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
+            {notice && <InlineAlert notice={notice} onClose={() => setNotice(null)} />}
+
             <div className="flex items-center gap-3 mb-6">
                 <div className="p-3 bg-purple-100 rounded-xl">
                     <Calendar className="w-6 h-6 text-purple-700" />
@@ -57,7 +61,7 @@ export function ServiciosExtra() {
                             tipoEntidad="Servicio Extraordinario"
                             onSave={(data) => {
                                 console.log('Guardando extra:', data);
-                                alert('Servicio Extraordinario registrado');
+                                setNotice({ type: 'success', message: 'Servicio extraordinario registrado.' });
                                 setShowForm(false);
                             }}
                             onCancel={() => setShowForm(false)}
