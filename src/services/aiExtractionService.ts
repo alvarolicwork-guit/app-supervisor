@@ -266,11 +266,48 @@ export async function extractFromPDF(
 /**
  * Extraer información desde una Imagen
  */
-export async function extractFromImage(idToken: string, _file: File): Promise<ExtractionResult> {
-    void idToken;
-    void _file;
-    // TODO: Implementar extracción desde imagen
-    throw new Error('La extracción desde imagen estará disponible próximamente. Por favor usa texto o PDF.');
+export async function extractFromImage(
+    idToken: string,
+    file: File,
+    mode: ExtractionMode = 'apertura'
+): Promise<ExtractionResult> {
+    if (file.size > MAX_AI_FILE_BYTES) {
+        throw new Error('La imagen supera el máximo de 3 MB permitido en la versión web.');
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        throw new Error('La imagen debe ser JPG, PNG o WebP.');
+    }
+
+    const content = mode === 'cierre'
+        ? 'Extrae las novedades y los casos relevantes de la imagen adjunta.'
+        : 'Extrae la información relevante del Plan de Operaciones de la imagen adjunta.';
+    const prompt = mode === 'cierre'
+        ? buildCierrePrompt(content, 'image')
+        : buildExtractionPrompt(content, 'image');
+
+    const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            const result = reader.result as string;
+            resolve(result.split(',')[1]);
+        };
+        reader.onerror = reject;
+    });
+
+    const response = await generateContentAction(idToken, prompt, {
+        base64,
+        mimeType: file.type,
+    });
+    const extracted = parseGeminiResponse(response);
+    const casosRelevantes = mapCasosRelevantes(extracted);
+
+    return {
+        data: mapToAperturaData(extracted),
+        casosRelevantes: casosRelevantes.length > 0 ? casosRelevantes : undefined,
+        observaciones: extracted.observaciones,
+        dudas: extracted.dudas,
+    };
 }
 
 function mapCasosRelevantes(extracted: GeminiExtractionResponse): CasoRelevante[] {

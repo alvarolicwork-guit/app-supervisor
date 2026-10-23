@@ -63,7 +63,7 @@ export function AIExtractionModal({ onExtracted, onCancel, mode = 'apertura' }: 
                 if (!file) {
                     throw new Error('Por favor selecciona una imagen');
                 }
-                result = await extractFromImage(idToken, file);
+                result = await extractFromImage(idToken, file, mode);
             }
 
             // Verificar que se extrajo al menos algo (datos, casos u observaciones)
@@ -185,10 +185,11 @@ export function AIExtractionModal({ onExtracted, onCancel, mode = 'apertura' }: 
                     </button>
 
                     <button
-                        type="button"
-                        disabled
-                        title="La extracción desde imágenes estará disponible próximamente"
-                        className="flex-1 min-w-[140px] px-4 sm:px-6 py-3 sm:py-4 font-medium text-gray-400 opacity-50 cursor-not-allowed"
+                        onClick={() => setActiveTab('image')}
+                        className={`flex-1 min-w-[140px] px-4 sm:px-6 py-3 sm:py-4 font-medium transition-all ${activeTab === 'image'
+                                ? 'border-b-2 border-indigo-600 bg-indigo-50 text-indigo-700'
+                                : 'text-slate-600 hover:bg-slate-50'
+                            }`}
                     >
                         <div className="flex items-center justify-center gap-2">
                             <ImageIcon className="w-5 h-5" />
@@ -287,15 +288,10 @@ export function AIExtractionModal({ onExtracted, onCancel, mode = 'apertura' }: 
                                     ) : (
                                         <div>
                                             <p className="text-sm font-medium text-gray-700">Click para tomar/seleccionar foto</p>
-                                            <p className="text-xs text-gray-500 mt-1">JPG, PNG - máx 10MB</p>
+                                            <p className="text-xs text-gray-500 mt-1">JPG, PNG o WebP · máximo 3 MB</p>
                                         </div>
                                     )}
                                 </label>
-                            </div>
-                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                                <p className="text-sm text-yellow-800">
-                                    ⚠️ Próximamente: La extracción desde imágenes (OCR) estará disponible en la próxima actualización.
-                                </p>
                             </div>
                         </div>
                     )}
