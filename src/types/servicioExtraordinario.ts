@@ -36,6 +36,9 @@ export interface CasoRelevante {
 export interface AperturaServicioExtra {
     // Datos del Plan de Operaciones
     nroPlanOperaciones: string;
+    turno?: string;
+    turnoEtiqueta?: string;
+    horarioTurno?: string;
     tipoServicio: string;
     personalContemplado: number;
     motosContempladas?: number;

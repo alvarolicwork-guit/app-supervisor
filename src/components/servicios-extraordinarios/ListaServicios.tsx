@@ -71,6 +71,11 @@ export function ListaServiciosExtraordinarios({
                                             <span className="font-bold text-gray-900">
                                                 Orden Nº {servicio.apertura.nroPlanOperaciones}
                                             </span>
+                                            {(servicio.apertura.turnoEtiqueta || servicio.apertura.turno) && (
+                                                <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                                                    {servicio.apertura.turnoEtiqueta || servicio.apertura.turno}
+                                                </span>
+                                            )}
                                             <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium">
                                                 Activo
                                             </span>
@@ -126,6 +131,11 @@ export function ListaServiciosExtraordinarios({
                                             <span className="font-bold text-gray-700">
                                                 Orden Nº {servicio.apertura.nroPlanOperaciones}
                                             </span>
+                                            {(servicio.apertura.turnoEtiqueta || servicio.apertura.turno) && (
+                                                <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                                                    {servicio.apertura.turnoEtiqueta || servicio.apertura.turno}
+                                                </span>
+                                            )}
                                             <span className="px-2 py-0.5 bg-gray-200 text-gray-600 text-xs rounded-full font-medium">
                                                 Cerrado
                                             </span>

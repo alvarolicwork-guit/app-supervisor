@@ -77,16 +77,22 @@ export default function HistorialPage() {
           createdAt: s.createdAt,
         }));
 
-        const jefeItems: HistorialItem[] = jefeRaw.map((s: ServicioJefeOperativo) => ({
-          id: s.id || '',
-          tipo: 'JEFE_OPERATIVO',
-          titulo: s.apertura.nroPlanOperaciones || s.apertura.tipoServicio || 'Servicio Jefe Operativo',
-          responsable: s.apertura.jefeOperativo || s.apertura.supervisorGeneral || '',
-          estado: s.estado,
-          inicio: s.apertura.fechaApertura,
-          fin: s.cierre?.fechaCierre,
-          createdAt: s.createdAt,
-        }));
+        const jefeItems: HistorialItem[] = jefeRaw.map((s: ServicioJefeOperativo) => {
+          const tituloBase =
+            s.apertura.nroPlanOperaciones || s.apertura.tipoServicio || 'Servicio Jefe Operativo';
+          const turno = s.apertura.turnoEtiqueta || s.apertura.turno;
+
+          return {
+            id: s.id || '',
+            tipo: 'JEFE_OPERATIVO',
+            titulo: turno ? `${tituloBase} · ${turno}` : tituloBase,
+            responsable: s.apertura.jefeOperativo || s.apertura.supervisorGeneral || '',
+            estado: s.estado,
+            inicio: s.apertura.fechaApertura,
+            fin: s.cierre?.fechaCierre,
+            createdAt: s.createdAt,
+          };
+        });
 
         setItems([...supervisorItems, ...jefeItems].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()));
       } catch (loadError) {

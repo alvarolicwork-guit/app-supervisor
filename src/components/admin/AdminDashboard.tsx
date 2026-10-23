@@ -785,6 +785,12 @@ function ServiciosTab({ router }: { router: ReturnType<typeof useRouter> }) {
                                         <p className="font-bold text-slate-900">
                                             {jefe.apertura.nroPlanOperaciones || 'Sin plan de operaciones'}
                                         </p>
+                                        {(jefe.apertura.turnoEtiqueta || jefe.apertura.turno) && (
+                                            <p className="text-xs font-semibold text-indigo-600">
+                                                {jefe.apertura.turnoEtiqueta || jefe.apertura.turno}
+                                                {jefe.apertura.horarioTurno ? ` · ${jefe.apertura.horarioTurno}` : ''}
+                                            </p>
+                                        )}
                                         <p className="text-sm text-slate-600">
                                             {jefe.apertura.tipoServicio || 'Sin tipo de servicio'}
                                         </p>

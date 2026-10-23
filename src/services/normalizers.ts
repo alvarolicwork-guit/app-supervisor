@@ -70,6 +70,9 @@ export function normalizarServicioExtra(value: unknown): ServicioExtraordinario 
   const apertura: AperturaServicioExtra = {
     ...(aperturaRaw as unknown as AperturaServicioExtra),
     nroPlanOperaciones: String(aperturaRaw.nroPlanOperaciones ?? ''),
+    turno: typeof aperturaRaw.turno === 'string' ? aperturaRaw.turno : '',
+    turnoEtiqueta: typeof aperturaRaw.turnoEtiqueta === 'string' ? aperturaRaw.turnoEtiqueta : '',
+    horarioTurno: typeof aperturaRaw.horarioTurno === 'string' ? aperturaRaw.horarioTurno : '',
     tipoServicio: String(aperturaRaw.tipoServicio ?? ''),
     personalContemplado: asNumber(aperturaRaw.personalContemplado),
     motosContempladas: asNumber(aperturaRaw.motosContempladas),

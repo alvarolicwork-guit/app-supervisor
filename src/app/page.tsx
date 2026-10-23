@@ -257,6 +257,14 @@ export default function HomePage() {
                         <span className="bg-indigo-100 text-indigo-700 py-1 px-3 rounded-full text-[10px] font-bold tracking-wider">OP. EXTRAORDINARIA EN CURSO</span>
                       </div>
                       <p className="text-xl font-bold text-gray-900">{jefeOperativoActivo.apertura.nroPlanOperaciones || "Sin Plan de Operaciones"}</p>
+                      {(jefeOperativoActivo.apertura.turnoEtiqueta || jefeOperativoActivo.apertura.horarioTurno) && (
+                        <p className="mt-1 text-sm font-semibold text-indigo-700">
+                          {jefeOperativoActivo.apertura.turnoEtiqueta || jefeOperativoActivo.apertura.turno || 'Turno'}
+                          {jefeOperativoActivo.apertura.horarioTurno
+                            ? ` · ${jefeOperativoActivo.apertura.horarioTurno}`
+                            : ''}
+                        </p>
+                      )}
                       <p className="flex items-center gap-1.5 text-gray-500 text-sm mt-1">
                         <Clock className="w-4 h-4" />
                         Iniciado: {formatFecha(jefeOperativoActivo.apertura.fechaApertura)}

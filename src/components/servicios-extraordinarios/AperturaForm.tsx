@@ -25,6 +25,9 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
 
     // Plan de Operaciones
     const [nroPlan, setNroPlan] = useState('');
+    const [turno, setTurno] = useState('');
+    const [turnoEtiqueta, setTurnoEtiqueta] = useState('');
+    const [horarioTurno, setHorarioTurno] = useState('');
     const [tipoServicio, setTipoServicio] = useState('');
     const [personalContemplado, setPersonalContemplado] = useState('');
     const [motosContempladas, setMotosContempladas] = useState('');
@@ -78,44 +81,43 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
     const [showAIModal, setShowAIModal] = useState(false);
     const [notice, setNotice] = useState<InlineAlertData | null>(null);
 
-    // Handler para auto-fill desde IA
+    // Handler para auto-fill desde IA. Reemplaza el bloque completo para que no
+    // queden datos del turno o servicio anterior.
     const handleAIExtraction = (data: Partial<AperturaServicioExtra>) => {
-        // ... (rest of the code remains the same as before until render) ...
-        // Auto-llenar campos del plan
-        if (data.nroPlanOperaciones) setNroPlan(data.nroPlanOperaciones);
-        if (data.tipoServicio) setTipoServicio(data.tipoServicio);
-            if (data.personalContemplado) setPersonalContemplado(data.personalContemplado.toString());
-            if (data.motosContempladas) setMotosContempladas(data.motosContempladas.toString());
-            if (data.vehiculosContemplados) setVehiculosContemplados(data.vehiculosContemplados.toString());
-            if (data.supervisorGeneral) setSupervisorGeneral(data.supervisorGeneral);
-        if (data.jefeOperativo) setJefeOperativo(data.jefeOperativo);
-        if (data.lugarFormacion) setLugarFormacion(data.lugarFormacion);
-        if (data.horaFormacion) setHoraFormacion(data.horaFormacion);
-        if (data.horaInstalacion) setHoraInstalacion(data.horaInstalacion);
-        if (data.tareas) setTareas(data.tareas);
+        const novedades = data.novedadesFormacion;
 
-        // Auto-llenar novedades de formación
-        if (data.novedadesFormacion) {
-            if (data.novedadesFormacion.personalFormo) {
-                setPersonalFormo(data.novedadesFormacion.personalFormo.toString());
-            }
-            if (data.novedadesFormacion.personalFalto) {
-                setPersonalFaltoCantidad(data.novedadesFormacion.personalFalto.cantidad.toString());
-                setPersonalFaltoLista(data.novedadesFormacion.personalFalto.lista);
-            }
-            if (data.novedadesFormacion.personalPermiso) {
-                setPersonalPermisoCantidad(data.novedadesFormacion.personalPermiso.cantidad.toString());
-                setPersonalPermisoLista(data.novedadesFormacion.personalPermiso.lista);
-            }
-            if (data.novedadesFormacion.observacionesUniforme && data.novedadesFormacion.observacionesUniforme.length > 0) {
-                setTieneNovedadesUniforme(true);
-                setObservacionesUniforme(data.novedadesFormacion.observacionesUniforme);
-            }
-        }
+        setNroPlan(data.nroPlanOperaciones || '');
+        setTurno(data.turno || '');
+        setTurnoEtiqueta(data.turnoEtiqueta || '');
+        setHorarioTurno(data.horarioTurno || '');
+        setTipoServicio(data.tipoServicio || '');
+        setPersonalContemplado(data.personalContemplado?.toString() || '');
+        setMotosContempladas(data.motosContempladas?.toString() || '');
+        setVehiculosContemplados(data.vehiculosContemplados?.toString() || '');
+        setSupervisorGeneral(
+            data.supervisorGeneral || (tipoUsuario === 'supervisor' ? nombreCompletoActual : '')
+        );
+        setJefeOperativo(
+            data.jefeOperativo || (tipoUsuario === 'jefe' ? nombreCompletoActual : '')
+        );
+        setLugarFormacion(data.lugarFormacion || '');
+        setHoraFormacion(data.horaFormacion || '');
+        setHoraInstalacion(data.horaInstalacion || '');
+        setTareas(data.tareas || '');
 
-        // Cerrar modal y mostrar éxito
+        setPersonalFormo(novedades?.personalFormo?.toString() || '');
+        setPersonalFaltoCantidad(novedades?.personalFalto?.cantidad?.toString() || '');
+        setPersonalFaltoLista(novedades?.personalFalto?.lista || []);
+        setPersonalPermisoCantidad(novedades?.personalPermiso?.cantidad?.toString() || '');
+        setPersonalPermisoLista(novedades?.personalPermiso?.lista || []);
+        setObservacionesUniforme(novedades?.observacionesUniforme || []);
+        setTieneNovedadesUniforme(Boolean(novedades?.observacionesUniforme?.length));
+
         setShowAIModal(false);
-        setNotice({ type: 'success', message: 'Información extraída correctamente. Revisa y completa los campos.' });
+        setNotice({
+            type: 'success',
+            message: 'Información del turno seleccionado cargada. Revisa y completa los campos.',
+        });
     };
 
     const agregarPersonalFalto = () => {
@@ -204,6 +206,9 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
 
         const data: AperturaServicioExtra = {
             nroPlanOperaciones: nroPlan,
+            turno: turno || undefined,
+            turnoEtiqueta: turnoEtiqueta || undefined,
+            horarioTurno: horarioTurno || undefined,
             tipoServicio,
             personalContemplado: parseInt(personalContemplado) || 0,
             motosContempladas: parseInt(motosContempladas) || 0,
@@ -318,6 +323,29 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
                                 value={parseInt(vehiculosContemplados) || 0}
                                 onChange={(val) => setVehiculosContemplados(val.toString())}
                             />
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div>
+                                <label className="app-label">Turno / servicio</label>
+                                <input
+                                    type="text"
+                                    value={turnoEtiqueta}
+                                    onChange={(e) => setTurnoEtiqueta(e.target.value)}
+                                    placeholder="Ej: Segundo Turno"
+                                    className="app-input mt-1.5"
+                                />
+                            </div>
+                            <div>
+                                <label className="app-label">Horario del turno</label>
+                                <input
+                                    type="text"
+                                    value={horarioTurno}
+                                    onChange={(e) => setHorarioTurno(e.target.value)}
+                                    placeholder="Ej: 14:00 - 22:00"
+                                    className="app-input mt-1.5"
+                                />
+                            </div>
                         </div>
 
                         <div>

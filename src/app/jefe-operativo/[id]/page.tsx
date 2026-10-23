@@ -44,6 +44,7 @@ function generarReporteWhatsapp(servicio: ServicioJefeOperativo): string {
 *COMANDO DEPARTAMENTAL DE LA POLICIA DE CHUQUISACA*
 
 *ORDEN DE OPERACIONES N° ${servicio.apertura.nroPlanOperaciones || 'S/N'}*
+*TURNO:* ${servicio.apertura.turnoEtiqueta || servicio.apertura.turno || 'NO REGISTRADO'}
 *${servicio.apertura.tipoServicio || 'SIN TÍTULO'}*
 *PARA CONFORMIDAD DE:*
 • Comandante departamental
@@ -122,6 +123,7 @@ function buildReporteCierreWhatsapp(servicio: ServicioJefeOperativo, cierre: Cie
 *COMANDO DEPARTAMENTAL DE LA POLICIA DE CHUQUISACA*
 
 *ORDEN DE OPERACIONES N° ${servicio.apertura.nroPlanOperaciones || 'S/N'}*
+*TURNO:* ${servicio.apertura.turnoEtiqueta || servicio.apertura.turno || 'NO REGISTRADO'}
 *${servicio.apertura.tipoServicio || 'SIN TÍTULO'}*
 *PARA CONFORMIDAD DE:*
 • Comandante departamental
@@ -191,6 +193,7 @@ function buildInformeInstitucionalDraft(servicio: ServicioJefeOperativo, cierre:
 
 COMANDO DEPARTAMENTAL DE LA POLICIA DE CHUQUISACA
 ORDEN DE OPERACIONES N° ${servicio.apertura.nroPlanOperaciones || 'S/N'}
+TURNO: ${servicio.apertura.turnoEtiqueta || servicio.apertura.turno || 'NO REGISTRADO'}
 OPERACIÓN: ${servicio.apertura.tipoServicio || 'SIN TÍTULO'}
 
 1. PERSONAL DE MANDO
@@ -465,6 +468,12 @@ export default function JefeOperativoDashboardPage() {
                                         <span className="text-indigo-50 leading-relaxed">{servicio.apertura.tipoServicio}</span>
                                         <div className="flex flex-wrap gap-2 mt-1 opacity-80 text-xs sm:text-sm">
                                             <span>Orden: {servicio.apertura.nroPlanOperaciones}</span>
+                                            {(servicio.apertura.turnoEtiqueta || servicio.apertura.turno) && (
+                                                <>
+                                                    <span>•</span>
+                                                    <span>Turno: {servicio.apertura.turnoEtiqueta || servicio.apertura.turno}</span>
+                                                </>
+                                            )}
                                             <span>•</span>
                                             <span>Lugar: {servicio.apertura.lugarFormacion}</span>
                                             <span>•</span>

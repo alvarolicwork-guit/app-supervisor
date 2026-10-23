@@ -9,6 +9,7 @@ import {
     MAX_AI_FILE_BYTES,
     ExtractionMode,
     ExtractionResult,
+    ExtraccionOpcion,
 } from '@/services/aiExtractionService';
 import { AperturaServicioExtra, CasoRelevante } from '@/types/servicioExtraordinario';
 import { useAuth } from '@/context/AuthContext';
@@ -36,9 +37,12 @@ export function AIExtractionModal({ onExtracted, onCancel, mode = 'apertura' }: 
     const [error, setError] = useState('');
     const [extractedResult, setExtractedResult] = useState<ExtractionResult | null>(null);
     const [resolvedDudas, setResolvedDudas] = useState<Record<string, string>>({});
+    const [opciones, setOpciones] = useState<ExtraccionOpcion[]>([]);
 
     const handleExtract = async () => {
         setError('');
+        setOpciones([]);
+        setExtractedResult(null);
         setLoading(true);
 
         try {
@@ -66,11 +70,19 @@ export function AIExtractionModal({ onExtracted, onCancel, mode = 'apertura' }: 
                 result = await extractFromImage(idToken, file, mode);
             }
 
-            // Verificar que se extrajo al menos algo (datos, casos u observaciones)
+            // Verificar que se extrajo al menos algo (datos, opciones, casos u observaciones)
+            const opcionesDetectadas = (result.opciones ?? []).filter(
+                (opcion) =>
+                    Object.keys(opcion.data).length > 0 ||
+                    (opcion.casosRelevantes?.length ?? 0) > 0 ||
+                    Boolean(opcion.observaciones?.trim())
+            );
             const tieneCasos = (result.casosRelevantes?.length ?? 0) > 0;
             const tieneObservaciones = Boolean(result.observaciones?.trim());
+            const tieneOpciones = opcionesDetectadas.length > 0;
             if (
                 Object.keys(result.data).length === 0 &&
+                !tieneOpciones &&
                 !tieneCasos &&
                 !tieneObservaciones &&
                 (!result.dudas || Object.keys(result.dudas).length === 0)
@@ -82,6 +94,20 @@ export function AIExtractionModal({ onExtracted, onCancel, mode = 'apertura' }: 
                 );
             }
 
+            // Si el plan contiene varios servicios/turnos, no completamos el
+            // formulario: pedimos al usuario que elija el bloque correcto.
+            if (opcionesDetectadas.length > 1) {
+                setOpciones(opcionesDetectadas);
+                return;
+            }
+
+            const opcionUnica = opcionesDetectadas[0];
+            const datosBase = opcionUnica?.data ?? result.data;
+            const extras = {
+                casosRelevantes: opcionUnica?.casosRelevantes ?? result.casosRelevantes,
+                observaciones: opcionUnica?.observaciones ?? result.observaciones,
+            };
+
             if (result.dudas && Object.keys(result.dudas).length > 0) {
                 // Initialize resolvedDudas with the first option for each doubt
                 const initialResolved: Record<string, string> = {};
@@ -89,12 +115,9 @@ export function AIExtractionModal({ onExtracted, onCancel, mode = 'apertura' }: 
                     initialResolved[key] = result.dudas![key][0];
                 });
                 setResolvedDudas(initialResolved);
-                setExtractedResult(result);
+                setExtractedResult({ ...result, data: datosBase });
             } else {
-                onExtracted(result.data, {
-                    casosRelevantes: result.casosRelevantes,
-                    observaciones: result.observaciones,
-                });
+                onExtracted(datosBase, extras);
             }
 
         } catch (err: any) {
@@ -111,6 +134,13 @@ export function AIExtractionModal({ onExtracted, onCancel, mode = 'apertura' }: 
         onExtracted(finalData, {
             casosRelevantes: extractedResult.casosRelevantes,
             observaciones: extractedResult.observaciones,
+        });
+    };
+
+    const aplicarOpcion = (opcion: ExtraccionOpcion) => {
+        onExtracted(opcion.data, {
+            casosRelevantes: opcion.casosRelevantes,
+            observaciones: opcion.observaciones,
         });
     };
 
@@ -198,8 +228,55 @@ export function AIExtractionModal({ onExtracted, onCancel, mode = 'apertura' }: 
                     </button>
                 </div>
 
+                {/* Selección de servicio/turno */}
+                {!extractedResult && opciones.length > 1 && (
+                    <div className="space-y-4 p-4 sm:p-6">
+                        <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+                            <h3 className="font-bold text-indigo-900">Selecciona el servicio o turno</h3>
+                            <p className="mt-1 text-sm text-indigo-700">
+                                El documento contiene {opciones.length} bloques. Elige cuál deseas registrar;
+                                solo se completarán los datos de ese bloque.
+                            </p>
+                        </div>
+
+                        <div className="space-y-2">
+                            {opciones.map((opcion) => (
+                                <button
+                                    key={opcion.id}
+                                    type="button"
+                                    onClick={() => aplicarOpcion(opcion)}
+                                    className="flex w-full flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-indigo-300 hover:bg-indigo-50/40 sm:flex-row sm:items-center sm:justify-between"
+                                >
+                                    <div className="min-w-0">
+                                        <p className="font-bold text-slate-900">{opcion.etiqueta}</p>
+                                        <p className="mt-0.5 text-sm text-slate-600">
+                                            Plan: {opcion.data.nroPlanOperaciones || 'Sin número'}
+                                            {opcion.data.tipoServicio ? ` · ${opcion.data.tipoServicio}` : ''}
+                                        </p>
+                                        <p className="mt-1 text-xs text-slate-500">
+                                            Jefe: {opcion.data.jefeOperativo || 'Sin registrar'}
+                                            {opcion.data.horarioTurno ? ` · ${opcion.data.horarioTurno}` : ''}
+                                        </p>
+                                    </div>
+                                    <span className="inline-flex shrink-0 items-center justify-center rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white">
+                                        Usar este bloque
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => setOpciones([])}
+                            className="app-btn-secondary w-full"
+                        >
+                            Volver a cargar el documento
+                        </button>
+                    </div>
+                )}
+
                 {/* Content */}
-                <div className="p-4 sm:p-6 space-y-4 overflow-y-auto">
+                <div className={`p-4 sm:p-6 space-y-4 overflow-y-auto ${opciones.length > 1 ? 'hidden' : ''}`}>
                     {/* WhatsApp Tab */}
                     {!extractedResult && activeTab === 'whatsapp' && (
                         <div className="space-y-3">
@@ -354,6 +431,7 @@ export function AIExtractionModal({ onExtracted, onCancel, mode = 'apertura' }: 
                 </div>
 
                 {/* Footer */}
+                {opciones.length <= 1 && (
                 <div className="p-4 sm:p-6 border-t bg-gray-50 rounded-b-2xl flex flex-col-reverse sm:flex-row gap-3">
                     <button
                         onClick={() => {
@@ -398,6 +476,7 @@ export function AIExtractionModal({ onExtracted, onCancel, mode = 'apertura' }: 
                         </button>
                     )}
                 </div>
+                )}
             </div>
         </div>
     );
