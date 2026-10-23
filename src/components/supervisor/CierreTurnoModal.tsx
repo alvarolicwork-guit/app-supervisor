@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { X, Save, LogOut } from 'lucide-react';
 import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
+import { normalizarNombre } from '@/utils/text';
 import type { DatosUnidadRegistrada } from './ResumenTurno';
 
 interface CierreTurnoModalProps {
@@ -57,7 +58,7 @@ export function CierreTurnoModal({ registros = [], onClose, onContinuar }: Cierr
         }
 
         onContinuar({
-            entregaServicio,
+            entregaServicio: normalizarNombre(entregaServicio),
             casosRutinarios: rutinaNum,
             casosRelevantes: relevantesNum,
             ajusteTotales: hayAjuste,
@@ -68,13 +69,13 @@ export function CierreTurnoModal({ registros = [], onClose, onContinuar }: Cierr
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-2 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100 max-h-[96vh] flex flex-col">
-                <div className="bg-gradient-to-r from-blue-900 to-slate-800 p-4 sm:p-6 flex justify-between items-center text-white">
-                    <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2 pr-2">
-                        <LogOut className="w-5 h-5" />
-                        Finalizar Turno
+                <div className="app-modal-header px-5 py-4">
+                    <h2 className="flex items-center gap-2 pr-2 text-base font-bold">
+                        <LogOut className="h-5 w-5" />
+                        Finalizar turno
                     </h2>
-                    <button onClick={onClose} className="hover:bg-white/20 p-2 rounded-full transition-colors">
-                        <X className="w-5 h-5" />
+                    <button onClick={onClose} className="rounded-full p-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white" aria-label="Cerrar">
+                        <X className="h-5 w-5" />
                     </button>
                 </div>
 
@@ -83,23 +84,24 @@ export function CierreTurnoModal({ registros = [], onClose, onContinuar }: Cierr
 
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1">
-                                Entrega de Servicio a
+                            <label className="app-label">
+                                Entrega de servicio a
                             </label>
                             <input
                                 type="text"
                                 required
                                 value={entregaServicio}
                                 onChange={(e) => setEntregaServicio(e.target.value)}
-                                placeholder="Grado y Nombre Completo"
-                                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
+                                onBlur={() => setEntregaServicio((valor) => normalizarNombre(valor))}
+                                placeholder="Grado y nombre completo"
+                                className="app-input mt-1.5"
                             />
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                                    Casos Rutinarios
+                                <label className="app-label">
+                                    Casos rutinarios
                                 </label>
                                 <input
                                     type="number"
@@ -108,12 +110,12 @@ export function CierreTurnoModal({ registros = [], onClose, onContinuar }: Cierr
                                     value={casosRutinarios}
                                     onChange={(e) => setCasosRutinarios(e.target.value)}
                                     placeholder="0"
-                                    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
+                                    className="app-input mt-1.5"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                                    Casos Relevantes
+                                <label className="app-label">
+                                    Casos relevantes
                                 </label>
                                 <input
                                     type="number"
@@ -122,12 +124,12 @@ export function CierreTurnoModal({ registros = [], onClose, onContinuar }: Cierr
                                     value={casosRelevantes}
                                     onChange={(e) => setCasosRelevantes(e.target.value)}
                                     placeholder="0"
-                                    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
+                                    className="app-input mt-1.5"
                                 />
                             </div>
                         </div>
 
-                        <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
                             <p className="font-semibold">
                                 Totales según los {registros.length} registro(s) de unidades:
                             </p>
@@ -145,7 +147,7 @@ export function CierreTurnoModal({ registros = [], onClose, onContinuar }: Cierr
 
                         {hayAjuste && (
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                                <label className="app-label">
                                     Justificación del ajuste
                                 </label>
                                 <textarea
@@ -155,7 +157,7 @@ export function CierreTurnoModal({ registros = [], onClose, onContinuar }: Cierr
                                     placeholder="Explica por qué los totales difieren de los registros..."
                                     rows={2}
                                     maxLength={300}
-                                    className="w-full px-4 py-3 rounded-xl border border-amber-300 bg-amber-50 focus:ring-2 focus:ring-amber-400 focus:border-amber-400 transition-all outline-none text-sm"
+                                    className="app-input mt-1.5 border-amber-300 bg-amber-50"
                                 />
                                 <p className="text-right text-[10px] text-gray-400 mt-1">
                                     {justificacionAjuste.length}/300
@@ -165,23 +167,23 @@ export function CierreTurnoModal({ registros = [], onClose, onContinuar }: Cierr
                     </div>
 
                     <div className="pt-2">
-                        <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4">
-                            <p className="text-xs text-blue-800">
+                        <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p className="text-xs text-slate-600">
                                 Al finalizar, se generará un reporte completo y el servicio quedará en modo
-                                &quot;Solo Lectura&quot;.
+                                &quot;solo lectura&quot;.
                             </p>
                         </div>
                         <div className="flex flex-col-reverse sm:flex-row gap-3">
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors"
+                                className="app-btn-secondary flex-1"
                             >
                                 Cancelar
                             </button>
                             <button
                                 type="submit"
-                                className="flex-1 px-4 py-3 bg-blue-900 text-white font-bold rounded-xl hover:bg-blue-800 transition-all shadow-lg shadow-blue-900/20 flex justify-center items-center gap-2"
+                                className="app-btn-primary flex-1"
                             >
                                 <Save className="w-5 h-5" />
                                 Finalizar

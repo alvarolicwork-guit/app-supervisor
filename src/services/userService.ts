@@ -19,6 +19,7 @@ import {
     sendPasswordResetEmail,
     signOut,
 } from 'firebase/auth';
+import { normalizarNombre } from '@/utils/text';
 
 export type UserRole = 'admin' | 'supervisor';
 
@@ -56,12 +57,17 @@ export const userService = {
      */
     async createUserProfile(uid: string, data: Partial<UserProfile>) {
         const docRef = doc(db, 'users', uid);
-        await setDoc(docRef, {
+        const payload: Record<string, unknown> = {
             ...data,
             uid,
             createdAt: new Date(),
-            isActive: true
-        }, { merge: true });
+            isActive: true,
+        };
+        if (data.grado !== undefined) payload.grado = normalizarNombre(data.grado);
+        if (data.nombreCompleto !== undefined) {
+            payload.nombreCompleto = normalizarNombre(data.nombreCompleto);
+        }
+        await setDoc(docRef, payload, { merge: true });
     },
 
     /**
@@ -78,7 +84,13 @@ export const userService = {
         uid: string,
         data: { grado?: string; nombreCompleto?: string; celular?: string }
     ): Promise<void> {
-        await updateDoc(doc(db, 'users', uid), data);
+        const payload: Record<string, string> = {};
+        if (data.grado !== undefined) payload.grado = normalizarNombre(data.grado);
+        if (data.nombreCompleto !== undefined) {
+            payload.nombreCompleto = normalizarNombre(data.nombreCompleto);
+        }
+        if (data.celular !== undefined) payload.celular = data.celular.trim();
+        await updateDoc(doc(db, 'users', uid), payload);
     },
 
     /**

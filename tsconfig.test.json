@@ -20,6 +20,8 @@
   "include": [
     "src/services/normalizers.ts",
     "src/utils/reporteSupervisor.ts",
+    "src/utils/text.ts",
+    "src/utils/resumen.ts",
     "tests/**/*.test.ts"
   ]
 }

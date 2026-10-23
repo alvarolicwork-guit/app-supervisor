@@ -5,6 +5,7 @@ import { X, FileText, User } from 'lucide-react';
 import { abrirServicioSupervisor, type SupervisorInfo } from '@/services/servicioSupervisorService';
 import { useAuth } from '@/context/AuthContext';
 import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
+import { normalizarNombre } from '@/utils/text';
 
 interface AbrirServicioModalProps {
     onClose: () => void;
@@ -42,7 +43,7 @@ export function AbrirServicioModal({ onClose, onServicioCreado }: AbrirServicioM
         try {
             const supervisorRelevo: SupervisorInfo = {
                 grado: 'Relevo', // Generic label since we combined the input
-                nombreCompleto: gradoRelevo.trim(), // We use the single input for the full string
+                nombreCompleto: normalizarNombre(gradoRelevo),
             };
 
             const supervisorActual: SupervisorInfo = {
@@ -76,16 +77,17 @@ export function AbrirServicioModal({ onClose, onServicioCreado }: AbrirServicioM
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-2 sm:p-4 backdrop-blur-sm animate-in fade-in">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-in zoom-in-95 slide-in-from-bottom-4 overflow-hidden max-h-[96vh] flex flex-col">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-emerald-800 to-emerald-900 p-4 sm:p-6 flex justify-between items-center text-white">
-                    <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2 pr-2">
-                        <FileText className="w-6 h-6" />
-                        Abrir Nuevo Turno
+                <div className="app-modal-header px-5 py-4">
+                    <h2 className="flex items-center gap-2 pr-2 text-base font-bold">
+                        <FileText className="h-5 w-5" />
+                        Abrir nuevo turno
                     </h2>
                     <button
                         onClick={onClose}
-                        className="text-white/80 hover:text-white hover:bg-white/10 p-2 rounded-full transition-colors"
+                        className="rounded-full p-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+                        aria-label="Cerrar"
                     >
-                        <X className="w-5 h-5" />
+                        <X className="h-5 w-5" />
                     </button>
                 </div>
 
@@ -94,51 +96,52 @@ export function AbrirServicioModal({ onClose, onServicioCreado }: AbrirServicioM
                     {notice && <InlineAlert notice={notice} onClose={() => setNotice(null)} />}
 
                     <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">
-                            📄 Nº Memorándum de Designación
+                        <label className="app-label">
+                            Nº Memorándum de designación
                         </label>
                         <input
                             type="text"
                             value={nroMemorandum}
                             onChange={(e) => setNroMemorandum(e.target.value)}
                             placeholder="Ej: 045/2025"
-                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all font-medium"
+                            className="app-input mt-1.5"
                             required
                             disabled={loading}
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">
-                            📅 Fecha y Hora de Inicio
+                        <label className="app-label">
+                            Fecha y hora de inicio
                         </label>
                         <input
                             type="datetime-local"
                             value={fechaHora}
                             onChange={(e) => setFechaHora(e.target.value)}
-                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                            className="app-input mt-1.5"
                             required
                             disabled={loading}
                         />
                     </div>
 
-                    <div className="bg-emerald-50/50 p-5 rounded-xl border border-emerald-100">
-                        <h3 className="font-bold text-emerald-900 mb-4 flex items-center gap-2 text-sm uppercase tracking-wide">
-                            <User className="w-4 h-4" />
-                            Datos del Relevo (Saliente)
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+                        <h3 className="app-label mb-4 flex items-center gap-2 text-slate-600">
+                            <User className="h-4 w-4" />
+                            Datos del relevo (saliente)
                         </h3>
 
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase">
-                                    Grado y Nombre del Relevo
+                                <label className="app-label">
+                                    Grado y nombre del relevo
                                 </label>
                                 <input
                                     type="text"
                                     value={gradoRelevo}
                                     onChange={(e) => setGradoRelevo(e.target.value)}
+                                    onBlur={() => setGradoRelevo((valor) => normalizarNombre(valor))}
                                     placeholder="Ej: Tcnl. Juan Pérez"
-                                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                                    className="app-input mt-1.5"
                                     required
                                     disabled={loading}
                                     autoComplete="off"
@@ -151,14 +154,14 @@ export function AbrirServicioModal({ onClose, onServicioCreado }: AbrirServicioM
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex-1 px-4 py-3.5 border border-gray-300 rounded-xl text-gray-700 font-bold hover:bg-gray-50 transition-colors"
+                            className="app-btn-secondary flex-1"
                             disabled={loading}
                         >
                             Cancelar
                         </button>
                         <button
                             type="submit"
-                            className="flex-1 px-4 py-3.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg hover:shadow-emerald-600/30 flex justify-center items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                            className="app-btn-primary flex-1"
                             disabled={loading}
                         >
                             {loading ? 'Procesando...' : 'Iniciar Turno'}

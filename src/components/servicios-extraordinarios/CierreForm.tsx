@@ -5,6 +5,7 @@ import { X, Save, Plus, Trash2, Users, Clock, Sparkles, Check } from 'lucide-rea
 import { PersonalNovedad, CierreServicioExtra, CasoRelevante, AperturaServicioExtra } from '@/types/servicioExtraordinario';
 import { AIExtractionModal } from './AIExtractionModal';
 import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
+import { normalizarNombre } from '@/utils/text';
 
 type AIExtractionData = Partial<AperturaServicioExtra> & {
     casosRelevantes?: CasoRelevante[];
@@ -53,8 +54,8 @@ export function CierreForm({ personalFaltoInicial, onSave, onCancel }: CierreFor
 
     // --- Handlers Personal Faltó ---
     const agregarPersonalFalto = () => {
-        if (tempGradoNombre) {
-            setPersonalFalto([...personalFalto, { gradoNombre: tempGradoNombre }]);
+        if (tempGradoNombre.trim()) {
+            setPersonalFalto([...personalFalto, { gradoNombre: normalizarNombre(tempGradoNombre) }]);
             setTempGradoNombre('');
         }
     };
@@ -93,7 +94,7 @@ export function CierreForm({ personalFaltoInicial, onSave, onCancel }: CierreFor
                 tipo: tempTipo,
                 hora: tempHora,
                 lugar: tempLugar,
-                encargado: tempEncargado,
+                encargado: normalizarNombre(tempEncargado),
                 detalle: tempDetalle
             };
             setCasos([...casos, nuevoCaso]);
@@ -175,10 +176,10 @@ export function CierreForm({ personalFaltoInicial, onSave, onCancel }: CierreFor
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl my-8">
                 {/* Header */}
-                <div className="bg-red-600 p-6 rounded-t-2xl flex justify-between items-center sticky top-0 z-10">
-                    <h2 className="text-xl font-bold text-white">Cierre Servicio Extraordinario</h2>
-                    <button onClick={onCancel} className="text-white hover:bg-red-700 p-2 rounded-lg transition-colors">
-                        <X className="w-6 h-6" />
+                <div className="app-modal-header sticky top-0 z-10 px-6">
+                    <h2 className="text-lg font-bold">Cierre servicio extraordinario</h2>
+                    <button onClick={onCancel} className="rounded-lg p-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white" aria-label="Cerrar">
+                        <X className="h-5 w-5" />
                     </button>
                 </div>
 
@@ -190,7 +191,7 @@ export function CierreForm({ personalFaltoInicial, onSave, onCancel }: CierreFor
                         <button
                             type="button"
                             onClick={() => setShowAIModal(true)}
-                            className="text-sm px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:shadow-md flex items-center gap-2"
+                            className="app-btn-secondary text-xs"
                         >
                             <Sparkles className="w-4 h-4" />
                             Auto-completar Novedades con IA
@@ -290,11 +291,12 @@ export function CierreForm({ personalFaltoInicial, onSave, onCancel }: CierreFor
                                     type="text"
                                     value={tempGradoNombre}
                                     onChange={(e) => setTempGradoNombre(e.target.value)}
+                                    onBlur={() => setTempGradoNombre((valor) => normalizarNombre(valor))}
                                     placeholder="Agregar grado y nombre..."
-                                    className="flex-1 px-3 py-2 border rounded-lg text-sm"
+                                    className="app-input flex-1"
                                 />
-                                <button type="button" onClick={agregarPersonalFalto} className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
-                                    <Plus className="w-4 h-4" />
+                                <button type="button" onClick={agregarPersonalFalto} className="app-btn-primary">
+                                    <Plus className="h-4 w-4" />
                                 </button>
                             </div>
                         </div>
@@ -351,10 +353,10 @@ export function CierreForm({ personalFaltoInicial, onSave, onCancel }: CierreFor
                                         <input type="text" value={tempTipo} onChange={(e) => setTempTipo(e.target.value)} placeholder="Tipo (Ej. Riña)" className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
                                         <input type="time" value={tempHora} onChange={(e) => setTempHora(e.target.value)} className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
                                         <input type="text" value={tempLugar} onChange={(e) => setTempLugar(e.target.value)} placeholder="Lugar" className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
-                                        <input type="text" value={tempEncargado} onChange={(e) => setTempEncargado(e.target.value)} placeholder="Encargado (Opcional)" className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+                                        <input type="text" value={tempEncargado} onChange={(e) => setTempEncargado(e.target.value)} onBlur={() => setTempEncargado((valor) => normalizarNombre(valor))} placeholder="Encargado (opcional)" className="app-input" />
                                     </div>
                                     <textarea value={tempDetalle} onChange={(e) => setTempDetalle(e.target.value)} placeholder="Detalle del hecho..." className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 mb-3" rows={2} />
-                                    <button type="button" onClick={agregarCaso} className="w-full py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+                                    <button type="button" onClick={agregarCaso} className="app-btn-primary w-full">
                                         Agregar Caso
                                     </button>
                                 </div>
@@ -404,7 +406,7 @@ export function CierreForm({ personalFaltoInicial, onSave, onCancel }: CierreFor
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="flex-1 px-6 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 flex items-center justify-center gap-2 shadow-lg shadow-red-200 disabled:opacity-70 disabled:cursor-not-allowed"
+                            className="app-btn-danger flex-1"
                         >
                             {isSubmitting ? (
                                 <>

@@ -1,63 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Save, Plus, Sparkles, Trash2, Minus } from 'lucide-react';
+import { X, Save, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { PersonalNovedad, AperturaServicioExtra, ObservacionUniforme } from '@/types/servicioExtraordinario';
 import { useAuth } from '@/context/AuthContext';
 import { AIExtractionModal } from './AIExtractionModal';
 import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
+import { NumberStepper } from '@/components/ui/NumberStepper';
+import { normalizarNombre } from '@/utils/text';
 
 interface AperturaFormProps {
     onSave: (data: AperturaServicioExtra) => void;
     onCancel: () => void;
     tipoUsuario?: 'supervisor' | 'jefe';
 }
-
-// Componente Local de Stepper Numérico
-const NumberStepper = ({ label, value, onChange, min = 0, max = 999 }: { label: string, value: number, onChange: (val: number) => void, min?: number, max?: number }) => {
-    const handleIncrement = () => {
-        if (value < max) onChange(value + 1);
-    };
-
-    const handleDecrement = () => {
-        if (value > min) onChange(value - 1);
-    };
-
-    return (
-        <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">{label}</label>
-            <div className="flex items-center bg-gray-50 rounded-xl border border-gray-200 p-1 w-full shadow-sm">
-                <button
-                    type="button"
-                    onClick={handleDecrement}
-                    disabled={value <= min}
-                    className="w-10 h-10 flex items-center justify-center bg-white rounded-lg border border-gray-200 text-gray-600 shadow-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all"
-                >
-                    <Minus className="w-4 h-4" />
-                </button>
-                <input
-                    type="tel"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={value}
-                    onChange={(e) => {
-                        const val = parseInt(e.target.value) || 0;
-                        if (val >= min && val <= max) onChange(val);
-                    }}
-                    className="w-full text-center bg-transparent font-bold text-gray-900 border-none outline-none focus:ring-0 text-lg mx-1"
-                />
-                <button
-                    type="button"
-                    onClick={handleIncrement}
-                    disabled={value >= max}
-                    className="w-10 h-10 flex items-center justify-center bg-blue-600 rounded-lg text-white shadow-md shadow-blue-200 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all"
-                >
-                    <Plus className="w-4 h-4" />
-                </button>
-            </div>
-        </div>
-    );
-};
 
 export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: AperturaFormProps) {
     // Obtener supervisor actual desde AuthContext
@@ -164,7 +120,7 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
 
     const agregarPersonalFalto = () => {
         if (tempGradoNombreFalto) {
-            const nuevaLista = [...personalFaltoLista, { gradoNombre: tempGradoNombreFalto }];
+            const nuevaLista = [...personalFaltoLista, { gradoNombre: normalizarNombre(tempGradoNombreFalto) }];
             setPersonalFaltoLista(nuevaLista);
             setTempGradoNombreFalto('');
             // Sincronizar recuento si es necesario
@@ -185,7 +141,7 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
 
     const agregarPersonalPermiso = () => {
         if (tempGradoNombrePermiso) {
-            const nuevaLista = [...personalPermisoLista, { gradoNombre: tempGradoNombrePermiso }];
+            const nuevaLista = [...personalPermisoLista, { gradoNombre: normalizarNombre(tempGradoNombrePermiso) }];
             setPersonalPermisoLista(nuevaLista);
             setTempGradoNombrePermiso('');
             // Sincronizar recuento
@@ -206,7 +162,7 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
     const agregarObservacion = () => {
         if (obsGradoNombre) {
             setObservacionesUniforme([...observacionesUniforme, {
-                gradoNombre: obsGradoNombre,
+                gradoNombre: normalizarNombre(obsGradoNombre),
                 tipo: obsTipo
             }]);
             setObsGradoNombre('');
@@ -229,7 +185,7 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
         let finalFaltoLista = [...personalFaltoLista];
         let finalFaltoCantidad = parseInt(personalFaltoCantidad) || 0;
         if (tempGradoNombreFalto.trim()) {
-            finalFaltoLista.push({ gradoNombre: tempGradoNombreFalto.trim() });
+            finalFaltoLista.push({ gradoNombre: normalizarNombre(tempGradoNombreFalto) });
             if (finalFaltoCantidad < finalFaltoLista.length) {
                 finalFaltoCantidad = finalFaltoLista.length;
             }
@@ -238,7 +194,7 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
         let finalPermisoLista = [...personalPermisoLista];
         let finalPermisoCantidad = parseInt(personalPermisoCantidad) || 0;
         if (tempGradoNombrePermiso.trim()) {
-            finalPermisoLista.push({ gradoNombre: tempGradoNombrePermiso.trim() });
+            finalPermisoLista.push({ gradoNombre: normalizarNombre(tempGradoNombrePermiso) });
             if (finalPermisoCantidad < finalPermisoLista.length) {
                 finalPermisoCantidad = finalPermisoLista.length;
             }
@@ -252,8 +208,8 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
             personalContemplado: parseInt(personalContemplado) || 0,
             motosContempladas: parseInt(motosContempladas) || 0,
             vehiculosContemplados: parseInt(vehiculosContemplados) || 0,
-            supervisorGeneral,
-            jefeOperativo,
+            supervisorGeneral: normalizarNombre(supervisorGeneral),
+            jefeOperativo: normalizarNombre(jefeOperativo),
             lugarFormacion,
             horaFormacion,
             horaInstalacion,
@@ -285,10 +241,10 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl my-3 sm:my-8 max-h-[96vh] flex flex-col overflow-hidden">
                 {/* Header */}
-                <div className="bg-blue-600 p-4 sm:p-6 rounded-t-2xl flex justify-between items-center sticky top-0 z-10">
-                    <h2 className="text-base sm:text-xl font-bold text-white pr-2">Apertura Servicio Extraordinario</h2>
-                    <button onClick={onCancel} className="text-white hover:bg-blue-700 p-2 rounded-lg transition-colors">
-                        <X className="w-6 h-6" />
+                <div className="app-modal-header sticky top-0 z-10 px-4 py-4 sm:px-6">
+                    <h2 className="pr-2 text-base font-bold sm:text-lg">Apertura servicio extraordinario</h2>
+                    <button onClick={onCancel} className="rounded-lg p-2 text-white/70 transition-colors hover:bg-white/10 hover:text-white" aria-label="Cerrar">
+                        <X className="h-5 w-5" />
                     </button>
                 </div>
 
@@ -296,30 +252,30 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
                     {notice && <InlineAlert notice={notice} onClose={() => setNotice(null)} />}
 
                     {/* AI Auto-complete Button */}
-                    <div className="bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 rounded-xl p-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <Sparkles className="w-5 h-5 text-purple-600" />
-                                    <h3 className="font-bold text-gray-900">Auto-completar con IA</h3>
+                                <div className="mb-1 flex items-center gap-2">
+                                    <Sparkles className="h-5 w-5 text-indigo-600" />
+                                    <h3 className="font-bold text-slate-900">Auto-completar con IA</h3>
                                 </div>
-                                <p className="text-sm text-gray-600">
-                                    Extrae información automáticamente desde WhatsApp, PDF o foto
+                                <p className="text-sm text-slate-600">
+                                    Extrae información desde WhatsApp, PDF o imagen.
                                 </p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setShowAIModal(true)}
-                                className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold rounded-xl hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg flex items-center justify-center gap-2"
+                                className="app-btn-primary w-full sm:w-auto"
                             >
-                                <Sparkles className="w-5 h-5" />
+                                <Sparkles className="h-4 w-4" />
                                 Usar IA
                             </button>
                         </div>
                     </div>
 
                     {/* Plan de Operaciones */}
-                    <div className="bg-gray-50 p-4 rounded-xl space-y-4">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-4">
                         <h3 className="font-bold text-lg text-gray-900">📑 Plan de Operaciones</h3>
  
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -330,7 +286,7 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
                                     value={nroPlan}
                                     onChange={(e) => setNroPlan(e.target.value)}
                                     placeholder="301/2026"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    className="app-input"
                                     required
                                 />
                             </div>
@@ -342,7 +298,7 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
                                     value={tipoServicio}
                                     onChange={(e) => setTipoServicio(e.target.value)}
                                     placeholder="PLAN INTEGRAL DE SEGURIDAD INTERNA"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    className="app-input"
                                     required
                                 />
                             </div>
@@ -370,8 +326,9 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
                                 type="text"
                                 value={supervisorGeneral}
                                 onChange={(e) => setSupervisorGeneral(e.target.value)}
+                                onBlur={() => setSupervisorGeneral((valor) => normalizarNombre(valor))}
                                 placeholder="Tcnl. DEAP Alberto Suarez Plata"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                className="app-input"
                                 required
                             />
                         </div>
@@ -382,8 +339,9 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
                                 type="text"
                                 value={jefeOperativo}
                                 onChange={(e) => setJefeOperativo(e.target.value)}
+                                onBlur={() => setJefeOperativo((valor) => normalizarNombre(valor))}
                                 placeholder="Tcnl. DEAP Alberto Suarez Plata"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                className="app-input"
                                 required
                             />
                         </div>
@@ -395,7 +353,7 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
                                     type="datetime-local"
                                     value={fechaApertura}
                                     onChange={(e) => setFechaApertura(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    className="app-input"
                                     required
                                 />
                             </div>
@@ -406,7 +364,7 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
                                     value={lugarFormacion}
                                     onChange={(e) => setLugarFormacion(e.target.value)}
                                     placeholder="Multipropósito"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    className="app-input"
                                     required
                                 />
                             </div>
@@ -417,7 +375,7 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
                                     type="time"
                                     value={horaFormacion}
                                     onChange={(e) => setHoraFormacion(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    className="app-input"
                                     required
                                 />
                             </div>
@@ -428,7 +386,7 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
                                     type="time"
                                     value={horaInstalacion}
                                     onChange={(e) => setHoraInstalacion(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    className="app-input"
                                     required
                                 />
                             </div>
@@ -440,7 +398,7 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
                                 value={tareas}
                                 onChange={(e) => setTareas(e.target.value)}
                                 placeholder="Resumen de la misión y ejecución del servicio..."
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 min-h-[100px] text-sm"
+                                className="app-input min-h-[100px]"
                                 maxLength={500}
                             />
                             <p className="text-right text-[10px] text-gray-500 mt-1">
@@ -450,7 +408,7 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
                     </div>
 
                     {/* Novedades de Formación */}
-                    <div className="bg-gray-50 p-4 rounded-xl space-y-4">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-4">
                         <h3 className="font-bold text-lg text-gray-900">👥 Novedades de Formación</h3>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -481,11 +439,16 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
                                         value={tempGradoNombreFalto}
                                         onChange={(e) => setTempGradoNombreFalto(e.target.value)}
                                         placeholder="Grado y Nombre Completo"
-                                        className="flex-1 px-2 py-1 border rounded text-sm focus:ring-1 focus:ring-red-500 outline-none"
-                                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), agregarPersonalFalto())}
+                                        className="app-input flex-1"
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                agregarPersonalFalto();
+                                            }
+                                        }}
                                     />
-                                    <button type="button" onClick={agregarPersonalFalto} className="w-full sm:w-auto px-3 py-2 sm:py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700 transition-colors shadow-sm">
-                                        <Plus className="w-4 h-4" />
+                                    <button type="button" onClick={agregarPersonalFalto} className="app-btn-primary w-full sm:w-auto">
+                                        <Plus className="h-4 w-4" />
                                     </button>
                                 </div>
                                 {personalFaltoLista.map((p, i) => (
@@ -514,11 +477,16 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
                                         value={tempGradoNombrePermiso}
                                         onChange={(e) => setTempGradoNombrePermiso(e.target.value)}
                                         placeholder="Grado y Nombre Completo"
-                                        className="flex-1 px-2 py-1 border rounded text-sm focus:ring-1 focus:ring-blue-500 outline-none"
-                                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), agregarPersonalPermiso())}
+                                        className="app-input flex-1"
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                agregarPersonalPermiso();
+                                            }
+                                        }}
                                     />
-                                    <button type="button" onClick={agregarPersonalPermiso} className="w-full sm:w-auto px-3 py-2 sm:py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors shadow-sm">
-                                        <Plus className="w-4 h-4" />
+                                    <button type="button" onClick={agregarPersonalPermiso} className="app-btn-primary w-full sm:w-auto">
+                                        <Plus className="h-4 w-4" />
                                     </button>
                                 </div>
                                 {personalPermisoLista.map((p, i) => (
@@ -539,7 +507,7 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
                     </div>
 
                     {/* OBSEVACIONES UNIFORME */}
-                    <div className="bg-gray-50 p-4 rounded-xl space-y-4">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-4">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                             <h3 className="font-bold text-lg text-gray-900">👮 Observaciones sobre el Uniforme</h3>
                             <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-1 rounded-lg border shadow-sm">
@@ -569,23 +537,34 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
                                         />
                                     </div>
                                     <div className="flex-1">
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">Observación</label>
-                                        <select
-                                            value={obsTipo}
-                                            onChange={(e) => setObsTipo(e.target.value as ObservacionUniforme['tipo'])}
-                                            className="w-full px-2 py-2 border rounded-lg text-sm"
-                                        >
-                                            <option value="Incorrecto">1. Uniforme incorrecto</option>
-                                            <option value="Sucio/Desarreglado">2. Uniforme sucio y desarreglado</option>
-                                            <option value="Incompleto">3. Sin implemento o balero Completo</option>
-                                        </select>
+                                        <label className="app-label">Observación</label>
+                                        <div className="mt-1.5 flex flex-wrap gap-2">
+                                            {[
+                                                { value: 'Incorrecto', label: 'Uniforme incorrecto' },
+                                                { value: 'Sucio/Desarreglado', label: 'Sucio y desarreglado' },
+                                                { value: 'Incompleto', label: 'Sin implemento completo' },
+                                            ].map((opcion) => (
+                                                <button
+                                                    key={opcion.value}
+                                                    type="button"
+                                                    onClick={() => setObsTipo(opcion.value as ObservacionUniforme['tipo'])}
+                                                    className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
+                                                        obsTipo === opcion.value
+                                                            ? 'border-slate-900 bg-slate-900 text-white'
+                                                            : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                                                    }`}
+                                                >
+                                                    {opcion.label}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
                                     <button
                                         type="button"
                                         onClick={agregarObservacion}
-                                        className="w-full md:w-auto px-3 py-2 bg-gray-800 text-white rounded-lg hover:bg-black transition-colors"
+                                        className="app-btn-primary w-full md:w-auto"
                                     >
-                                        <Plus className="w-5 h-5" />
+                                        <Plus className="h-4 w-4" />
                                     </button>
                                 </div>
 
@@ -623,14 +602,14 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
                             type="button"
                             onClick={onCancel}
                             disabled={isSubmitting}
-                            className="flex-1 px-6 py-3 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 disabled:opacity-50"
+                            className="app-btn-secondary flex-1"
                         >
                             Cancelar
                         </button>
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="flex-1 px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                            className="app-btn-primary flex-1"
                         >
                             {isSubmitting ? (
                                 <>

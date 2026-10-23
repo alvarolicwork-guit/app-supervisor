@@ -1,10 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, Loader2, ClipboardPaste, Users, AlertTriangle, FileText, Minus, Plus } from 'lucide-react';
+import { Sparkles, Loader2, ClipboardPaste, Users, AlertTriangle, FileText } from 'lucide-react';
 import { extraerDatosCasoAction } from '@/app/actions';
 import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
+import { NumberStepper } from '@/components/ui/NumberStepper';
+import {
+    PersonasNovedad,
+    type NovedadesPersonal,
+} from '@/components/ui/PersonasNovedad';
 import { useAuth } from '@/context/AuthContext';
+import { normalizarNombre } from '@/utils/text';
 import type { DatosUnidadRegistrada } from './ResumenTurno';
 
 interface FormularioUnidadProps {
@@ -16,7 +22,6 @@ interface FormularioUnidadProps {
 }
 
 type NovedadPersonal = 'sin' | 'con';
-type TipoNovedadPersonal = 'faltante' | 'abandono' | 'arresto' | 'permiso' | null;
 
 interface CasoRelevante {
     id: string;
@@ -26,52 +31,6 @@ interface CasoRelevante {
     encargado: string;
     detalle: string;
 }
-
-// Componente Local de Stepper Numérico
-const NumberStepper = ({ label, value, onChange, min = 0, max = 999 }: { label: string, value: number, onChange: (val: number) => void, min?: number, max?: number }) => {
-    const handleIncrement = () => {
-        if (value < max) onChange(value + 1);
-    };
-
-    const handleDecrement = () => {
-        if (value > min) onChange(value - 1);
-    };
-
-    return (
-        <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">{label}</label>
-            <div className="flex items-center bg-gray-50 rounded-xl border border-gray-200 p-1 w-full sm:w-fit shadow-sm">
-                <button
-                    type="button"
-                    onClick={handleDecrement}
-                    disabled={value <= min}
-                    className="w-10 h-10 flex items-center justify-center bg-white rounded-lg border border-gray-200 text-gray-600 shadow-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all"
-                >
-                    <Minus className="w-4 h-4" />
-                </button>
-                <input
-                    type="tel"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={value}
-                    onChange={(e) => {
-                        const val = parseInt(e.target.value) || 0;
-                        if (val >= min && val <= max) onChange(val);
-                    }}
-                    className="w-16 text-center bg-transparent font-bold text-gray-900 border-none outline-none focus:ring-0 text-lg mx-1"
-                />
-                <button
-                    type="button"
-                    onClick={handleIncrement}
-                    disabled={value >= max}
-                    className="w-10 h-10 flex items-center justify-center bg-emerald-600 rounded-lg text-white shadow-md shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all"
-                >
-                    <Plus className="w-4 h-4" />
-                </button>
-            </div>
-        </div>
-    );
-};
 
 export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, onSave, onCancel }: FormularioUnidadProps) {
     const { user } = useAuth();
@@ -93,8 +52,6 @@ export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, 
     const [abandono, setAbandono] = useState<string[]>([]);
     const [arrestados, setArrestados] = useState<string[]>([]);
     const [permisos, setPermisos] = useState<string[]>([]);
-    const [tempNombre, setTempNombre] = useState('');
-    const [tipoAgregando, setTipoAgregando] = useState<TipoNovedadPersonal>(null);
 
     // --- Estados de Servicio ---
     const [casosRutina, setCasosRutina] = useState(0);
@@ -121,15 +78,19 @@ export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [notice, setNotice] = useState<InlineAlertData | null>(null);
 
-    // --- Funciones Personal ---
-    function addPersonalList() {
-        if (!tempNombre.trim()) return;
-        if (tipoAgregando === 'faltante') setFaltantes(p => [...p, tempNombre]);
-        if (tipoAgregando === 'abandono') setAbandono(p => [...p, tempNombre]);
-        if (tipoAgregando === 'arresto') setArrestados(p => [...p, tempNombre]);
-        if (tipoAgregando === 'permiso') setPermisos(p => [...p, tempNombre]);
-        setTempNombre('');
-    }
+    const novedadesPersonal: NovedadesPersonal = {
+        faltantes,
+        abandono,
+        arrestados,
+        permisos,
+    };
+
+    const actualizarNovedades = (next: NovedadesPersonal) => {
+        setFaltantes(next.faltantes);
+        setAbandono(next.abandono);
+        setArrestados(next.arrestados);
+        setPermisos(next.permisos);
+    };
 
     // --- Funciones Casos ---
     function handleSaveCase() {
@@ -137,7 +98,14 @@ export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, 
             setNotice({ type: 'error', message: 'Debe ingresar al menos tipo y detalle del caso.' });
             return;
         }
-        setCasosRelevantes(prev => [...prev, { ...newCase, id: Math.random().toString(36).substring(7) }]);
+        setCasosRelevantes(prev => [
+            ...prev,
+            {
+                ...newCase,
+                encargado: normalizarNombre(newCase.encargado),
+                id: Math.random().toString(36).substring(7),
+            },
+        ]);
         setNewCase({ tipo: '', hora: '', lugar: '', encargado: '', detalle: '' });
         setIsAddingCase(false);
     }
@@ -186,7 +154,7 @@ export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, 
                 await onSave({
                     unidad: nombreUnidad,
                     fechaHoraControl: fechaControl,
-                    jefeSeguridad: jefeSeguridad.trim(),
+                    jefeSeguridad: normalizarNombre(jefeSeguridad),
                     personal: { cantidad: cantPersonal, estado: novPersonal, detalles: { faltantes, abandono, arrestados, permisos } },
                     poblacionPenal: {
                         total: pplVarones + pplMujeres,
@@ -212,67 +180,68 @@ export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, 
     }
 
     return (
-        <div className="bg-white rounded-xl shadow-lg border overflow-hidden animate-in fade-in zoom-in-95 duration-300">
-            <div className="bg-emerald-900 p-4 flex justify-between items-center text-white">
-                <h3 className="font-bold text-lg">Registro: {nombreUnidad}</h3>
-                <button onClick={onCancel} className="text-emerald-200 hover:text-white">✕</button>
+        <div className="app-card overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+            <div className="app-modal-header">
+                <h3 className="text-base font-bold">Registro: {nombreUnidad}</h3>
+                <button onClick={onCancel} className="rounded-lg p-1 text-white/70 hover:bg-white/10 hover:text-white" aria-label="Cerrar">
+                    ✕
+                </button>
             </div>
 
-            <div className="p-5 space-y-5 overflow-y-auto max-h-[80vh]">
+            <div className="max-h-[80vh] space-y-5 overflow-y-auto p-5">
                 {notice && <InlineAlert notice={notice} onClose={() => setNotice(null)} />}
 
-                {/* SECCIÓN SUPERIOR: DATOS GENERALES (Compact layout) */}
-                <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100 shadow-sm">
-                    <div className="flex items-center gap-2 mb-3">
-                        <FileText className="w-4 h-4 text-emerald-700" />
-                        <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider">Datos Generales del Control</h4>
+                {/* SECCIÓN SUPERIOR: DATOS GENERALES */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="mb-3 flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-indigo-600" />
+                        <h4 className="app-label">Datos generales del control</h4>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-8 items-start">
-                        {/* 1. FECHA */}
-                        <div className="flex flex-col gap-1.5">
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Fecha y Hora</label>
+                    <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-3 lg:gap-8">
+                        <div>
+                            <label className="app-label">Fecha y hora</label>
                             <input
                                 type="datetime-local"
-                                className="w-full bg-white border border-gray-200 rounded-xl p-2 text-sm text-gray-700 font-mono shadow-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                                className="app-input mt-1.5 font-mono"
                                 value={fechaControl}
                                 onChange={e => setFechaControl(e.target.value)}
                             />
                         </div>
 
-                        {/* 1.1 JEFE DE SEGURIDAD (New Field) */}
-                        <div className="flex flex-col gap-1.5 align-top">
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Jefe de Seguridad / Responsable</label>
+                        <div>
+                            <label className="app-label">Jefe de seguridad / Responsable</label>
                             <input
                                 type="text"
-                                className="w-full bg-white border border-gray-200 rounded-xl p-2 text-sm text-gray-800 placeholder-gray-400 shadow-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                                placeholder="Grado y Nombre Completo"
+                                className="app-input mt-1.5"
+                                placeholder="Grado y nombre completo"
                                 value={jefeSeguridad}
                                 onChange={e => setJefeSeguridad(e.target.value)}
+                                onBlur={() => setJefeSeguridad((valor) => normalizarNombre(valor))}
                             />
                         </div>
 
-                        {/* 2. EFECTIVOS */}
-                        <div className="md:border-l md:pl-6 border-gray-200">
+                        <div className="md:border-l md:border-slate-200 md:pl-6">
                             <NumberStepper
-                                label="Efectivos de Servicio"
+                                label="Efectivos de servicio"
                                 value={cantPersonal}
                                 onChange={setCantPersonal}
+                                hint="Personal presente en la unidad."
                             />
                         </div>
 
-                        {/* 3. CASOS RUTINA / PPL (Dependiendo tipo unidad) */}
-                        <div className="md:border-l md:pl-6 border-gray-200">
+                        <div className="md:border-l md:border-slate-200 md:pl-6">
                             {isPenal ? (
-                                <div className="p-2 bg-orange-50 rounded-lg border border-orange-100 text-center">
-                                    <span className="block text-xs font-bold text-orange-800 uppercase mb-1">Total PPL</span>
-                                    <span className="text-2xl font-bold text-orange-600">{pplVarones + pplMujeres}</span>
+                                <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-3 text-center">
+                                    <span className="block text-xs font-bold uppercase text-indigo-700">Total PPL</span>
+                                    <span className="text-2xl font-bold text-indigo-900">{pplVarones + pplMujeres}</span>
                                 </div>
                             ) : (
                                 <NumberStepper
-                                    label="Casos Rutinarios"
+                                    label="Casos rutinarios"
                                     value={casosRutina}
                                     onChange={setCasosRutina}
+                                    hint="Casos sin relevancia especial."
                                 />
                             )}
                         </div>
@@ -280,86 +249,76 @@ export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, 
                 </div>
 
                 {/* SECCIÓN 2: ESTADO PERSONAL */}
-                <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-                    <div className="flex justify-between items-center mb-2">
-                        <div className="flex items-center gap-2">
-                            <Users className="w-4 h-4 text-emerald-600" />
-                            <h4 className="font-bold text-gray-700 text-xs uppercase">Novedades del Personal</h4>
-                        </div>
+                <div className="app-card p-4">
+                    <div className="mb-3 flex items-center gap-2">
+                        <Users className="h-4 w-4 text-indigo-600" />
+                        <h4 className="app-label">Novedades del Personal</h4>
                     </div>
 
-                    <div className="flex flex-wrap gap-4 items-center">
-                        <div className="flex bg-gray-50 rounded-lg p-1 border">
+                    <div className="flex flex-wrap items-center gap-4">
+                        <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1">
                             <button
+                                type="button"
                                 onClick={() => setNovPersonal('sin')}
-                                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${novPersonal === 'sin' ? 'bg-white text-emerald-700 shadow-sm border border-emerald-100' : 'text-gray-500 hover:text-gray-700'}`}
+                                className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition ${
+                                    novPersonal === 'sin'
+                                        ? 'bg-white text-slate-900 shadow-sm'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                }`}
                             >
-                                Sin Novedad
+                                Sin novedad
                             </button>
                             <button
+                                type="button"
                                 onClick={() => setNovPersonal('con')}
-                                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${novPersonal === 'con' ? 'bg-red-50 text-red-700 shadow-sm border border-red-100' : 'text-gray-500 hover:text-gray-700'}`}
+                                className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition ${
+                                    novPersonal === 'con'
+                                        ? 'bg-white text-rose-700 shadow-sm'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                }`}
                             >
-                                Con Novedad
+                                Con novedad
                             </button>
                         </div>
 
-                        {/* Resumen rápido si hay novedades */}
                         {novPersonal === 'con' && (
-                            <span className="text-xs text-red-500 italic bg-red-50 px-2 py-1 rounded">
-                                {faltantes.length + abandono.length + arrestados.length + permisos.length} reg.
+                            <span className="rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
+                                {novedadesPersonal.faltantes.length +
+                                    novedadesPersonal.abandono.length +
+                                    novedadesPersonal.arrestados.length +
+                                    novedadesPersonal.permisos.length}{' '}
+                                registro(s)
                             </span>
                         )}
                     </div>
 
                     {novPersonal === 'con' && (
                         <div className="mt-4 animate-in slide-in-from-top-2">
-                            <div className="flex gap-2 border-b border-gray-100 pb-2 mb-3 overflow-x-auto">
-                                <button onClick={() => setTipoAgregando('faltante')} className={`whitespace-nowrap px-3 py-1 text-xs font-bold rounded-full transition-colors ${tipoAgregando === 'faltante' ? 'bg-red-600 text-white' : 'bg-white text-red-600 border border-red-200 hover:bg-red-50'}`}>Faltantes</button>
-                                <button onClick={() => setTipoAgregando('abandono')} className={`whitespace-nowrap px-3 py-1 text-xs font-bold rounded-full transition-colors ${tipoAgregando === 'abandono' ? 'bg-orange-600 text-white' : 'bg-white text-orange-600 border border-orange-200 hover:bg-orange-50'}`}>Abandono</button>
-                                <button onClick={() => setTipoAgregando('arresto')} className={`whitespace-nowrap px-3 py-1 text-xs font-bold rounded-full transition-colors ${tipoAgregando === 'arresto' ? 'bg-gray-700 text-white' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'}`}>Arrestados</button>
-                                <button onClick={() => setTipoAgregando('permiso')} className={`whitespace-nowrap px-3 py-1 text-xs font-bold rounded-full transition-colors ${tipoAgregando === 'permiso' ? 'bg-yellow-500 text-white' : 'bg-white text-yellow-600 border border-yellow-200 hover:bg-yellow-50'}`}>Permiso</button>
-                            </div>
-
-                            {tipoAgregando && (
-                                <div className="flex gap-2 mb-3">
-                                    <input
-                                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-200 outline-none"
-                                        placeholder={`Grado y Nombre (${tipoAgregando})...`}
-                                        value={tempNombre}
-                                        onChange={e => setTempNombre(e.target.value)}
-                                        onKeyDown={e => e.key === 'Enter' && addPersonalList()}
-                                    />
-                                    <button onClick={addPersonalList} className="bg-gray-900 text-white px-4 rounded-lg text-sm font-bold shadow-md hover:bg-black active:scale-95 transition-transform">+</button>
-                                </div>
-                            )}
-
-                            <div className="flex flex-wrap gap-2">
-                                {faltantes.map((n, i) => <div key={i} className="flex items-center gap-2 bg-red-50 text-red-700 px-3 py-1 rounded-lg border border-red-100 text-xs font-bold"><span className="uppercase">Falta: {n}</span><button onClick={() => setFaltantes(p => p.filter(x => x !== n))} className="hover:text-red-900">×</button></div>)}
-                                {abandono.map((n, i) => <div key={i} className="flex items-center gap-2 bg-orange-50 text-orange-700 px-3 py-1 rounded-lg border border-orange-100 text-xs font-bold"><span className="uppercase">Abandono: {n}</span><button onClick={() => setAbandono(p => p.filter(x => x !== n))} className="hover:text-orange-900">×</button></div>)}
-                                {arrestados.map((n, i) => <div key={i} className="flex items-center gap-2 bg-gray-100 text-gray-700 px-3 py-1 rounded-lg border border-gray-200 text-xs font-bold"><span className="uppercase">Arresto: {n}</span><button onClick={() => setArrestados(p => p.filter(x => x !== n))} className="hover:text-gray-900">×</button></div>)}
-                                {permisos.map((n, i) => <div key={i} className="flex items-center gap-2 bg-yellow-50 text-yellow-700 px-3 py-1 rounded-lg border border-yellow-100 text-xs font-bold"><span className="uppercase">Permiso: {n}</span><button onClick={() => setPermisos(p => p.filter(x => x !== n))} className="hover:text-yellow-900">×</button></div>)}
-                            </div>
+                            <PersonasNovedad
+                                value={novedadesPersonal}
+                                onChange={actualizarNovedades}
+                                disabled={soloLectura}
+                            />
                         </div>
                     )}
                 </div>
 
                 {/* SECCIÓN 3: PPL DETALLE (Solo Penal) */}
                 {isPenal && (
-                    <div className="bg-orange-50/50 p-4 rounded-xl border border-orange-100 shadow-sm animate-in fade-in">
-                        <div className="flex items-center gap-2 mb-3">
-                            <Users className="w-4 h-4 text-orange-600" />
-                            <h4 className="font-bold text-gray-800 text-xs uppercase">Detalle Población Penal</h4>
+                    <div className="app-card p-4 animate-in fade-in">
+                        <div className="mb-3 flex items-center gap-2">
+                            <Users className="h-4 w-4 text-indigo-600" />
+                            <h4 className="app-label">Detalle población penal</h4>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                             <NumberStepper label="Varones" value={pplVarones} onChange={setPplVarones} />
                             <NumberStepper label="Mujeres" value={pplMujeres} onChange={setPplMujeres} />
-                            <NumberStepper label="Det. Domiciliaria" value={pplDetencion} onChange={setPplDetencion} />
+                            <NumberStepper label="Detención domiciliaria" value={pplDetencion} onChange={setPplDetencion} />
                         </div>
                         <div className="mt-4">
-                            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Novedades (Texto)</label>
+                            <label className="app-label">Novedades (texto)</label>
                             <textarea
-                                className="w-full bg-white border border-orange-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-orange-200 outline-none"
+                                className="app-input mt-1.5"
                                 rows={2}
                                 placeholder="Escriba novedades..."
                                 value={novedadesTexto}
@@ -371,18 +330,18 @@ export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, 
 
                 {/* SECCIÓN 4: CASOS RELEVANTES (Solo No Penal) */}
                 {!isPenal && (
-                    <div className="bg-indigo-50/30 rounded-xl border border-indigo-100 p-4 shadow-sm">
-                        <div className="flex justify-between items-end mb-4 border-b border-indigo-100 pb-2">
+                    <div className="app-card p-4">
+                        <div className="mb-4 flex items-end justify-between border-b border-slate-200 pb-2">
                             <div className="flex items-center gap-2">
-                                <AlertTriangle className="w-4 h-4 text-indigo-600" />
-                                <h4 className="font-bold text-gray-800 text-xs uppercase">Casos de Relevancia</h4>
+                                <AlertTriangle className="h-4 w-4 text-indigo-600" />
+                                <h4 className="app-label">Casos de relevancia</h4>
                             </div>
                             {!isAddingCase && (
-                                <div className="flex gap-2 scale-90 origin-right">
-                                    <button onClick={() => setShowAiModal(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-purple-200 text-purple-700 rounded-lg text-xs font-bold hover:bg-purple-50 transition-all shadow-sm">
-                                        <Sparkles className="w-3.5 h-3.5" /> IA / WhatsApp
+                                <div className="flex origin-right scale-90 gap-2">
+                                    <button onClick={() => setShowAiModal(true)} className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-indigo-700 shadow-sm transition hover:bg-slate-50">
+                                        <Sparkles className="h-3.5 w-3.5" /> IA / WhatsApp
                                     </button>
-                                    <button onClick={() => setIsAddingCase(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-md">
+                                    <button onClick={() => setIsAddingCase(true)} className="app-btn-primary px-3 py-1.5 text-xs">
                                         + Agregar
                                     </button>
                                 </div>
@@ -394,22 +353,22 @@ export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, 
                             <div className="bg-white rounded-xl p-4 border border-indigo-200 animate-in slide-in-from-top-2 shadow-sm mb-4">
                                 <div className="grid grid-cols-2 gap-3 mb-3">
                                     <div>
-                                        <label className="text-[10px] font-bold text-gray-400 uppercase mb-1">Hora</label>
-                                        <input type="time" className="w-full border rounded-lg p-2 text-sm bg-gray-50" value={newCase.hora} onChange={e => setNewCase({ ...newCase, hora: e.target.value })} />
+                                        <label className="app-label">Hora</label>
+                                        <input type="time" className="app-input mt-1" value={newCase.hora} onChange={e => setNewCase({ ...newCase, hora: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-bold text-gray-400 uppercase mb-1">Tipo</label>
-                                        <input type="text" className="w-full border rounded-lg p-2 text-sm bg-gray-50" placeholder="Tipología..." value={newCase.tipo} onChange={e => setNewCase({ ...newCase, tipo: e.target.value })} />
+                                        <label className="app-label">Tipo</label>
+                                        <input type="text" className="app-input mt-1" placeholder="Tipología..." value={newCase.tipo} onChange={e => setNewCase({ ...newCase, tipo: e.target.value })} />
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3 mb-3">
-                                    <input type="text" className="w-full border rounded-lg p-2 text-sm" placeholder="Lugar..." value={newCase.lugar} onChange={e => setNewCase({ ...newCase, lugar: e.target.value })} />
-                                    <input type="text" className="w-full border rounded-lg p-2 text-sm" placeholder="Encargado..." value={newCase.encargado} onChange={e => setNewCase({ ...newCase, encargado: e.target.value })} />
+                                    <input type="text" className="app-input" placeholder="Lugar..." value={newCase.lugar} onChange={e => setNewCase({ ...newCase, lugar: e.target.value })} />
+                                    <input type="text" className="app-input" placeholder="Encargado..." value={newCase.encargado} onChange={e => setNewCase({ ...newCase, encargado: e.target.value })} onBlur={() => setNewCase((prev) => ({ ...prev, encargado: normalizarNombre(prev.encargado) }))} />
                                 </div>
-                                <textarea className="w-full border rounded-lg p-2 text-sm mb-3 h-20 resize-none" placeholder="Detalle..." value={newCase.detalle} onChange={e => setNewCase({ ...newCase, detalle: e.target.value })} />
+                                <textarea className="app-input mb-3 h-20 resize-none" placeholder="Detalle..." value={newCase.detalle} onChange={e => setNewCase({ ...newCase, detalle: e.target.value })} />
                                 <div className="flex justify-end gap-2">
-                                    <button onClick={() => setIsAddingCase(false)} className="px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100 rounded">Cancelar</button>
-                                    <button onClick={handleSaveCase} className="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded font-bold">Guardar</button>
+                                    <button onClick={() => setIsAddingCase(false)} className="app-btn-secondary px-3 py-1.5 text-xs">Cancelar</button>
+                                    <button onClick={handleSaveCase} className="app-btn-primary px-3 py-1.5 text-xs">Guardar</button>
                                 </div>
                             </div>
                         )}
@@ -434,30 +393,37 @@ export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, 
 
             </div>
 
-            <div className="p-4 bg-gray-50 border-t flex justify-end gap-3">
-                <button onClick={onCancel} className="px-5 py-2.5 rounded-xl text-gray-600 font-medium hover:bg-gray-200">Cancelar</button>
+            <div className="flex justify-end gap-3 border-t border-slate-200 bg-slate-50 p-4">
+                <button onClick={onCancel} className="app-btn-secondary">Cancelar</button>
                 <button
                     onClick={() => void handleSave()}
                     disabled={soloLectura || isSubmitting}
-                    className="px-5 py-2.5 rounded-xl bg-emerald-800 text-white font-bold shadow-lg hover:bg-emerald-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="app-btn-primary"
                 >
-                    {soloLectura ? 'Solo Lectura' : isSubmitting ? 'Guardando...' : 'Guardar Registro'}
+                    {soloLectura ? 'Solo lectura' : isSubmitting ? 'Guardando...' : 'Guardar registro'}
                 </button>
             </div>
             {/* MODAL IA */}
             {showAiModal && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl p-6 animate-in zoom-in-95">
-                        <h3 className="font-bold text-lg text-gray-900 mb-2 flex items-center gap-2">
-                            <Sparkles className="text-purple-600" /> Extracción Inteligente
-                        </h3>
-                        <p className="text-sm text-gray-500 mb-4">Pegue el reporte de WhatsApp y la IA completará las casillas automáticamente.</p>
-                        <textarea className="w-full h-40 border rounded-xl p-3 text-xs font-mono bg-gray-50 focus:ring-2 focus:ring-purple-500 outline-none resize-none" placeholder={`PEGA AQUÍ EL TEXTO...`} value={aiText} onChange={e => setAiText(e.target.value)} />
-                        <div className="flex justify-end gap-3 mt-4">
-                            <button onClick={() => setShowAiModal(false)} className="px-4 py-2 text-gray-500 font-medium hover:bg-gray-100 rounded-lg">Cancelar</button>
-                            <button onClick={handleAiExtraction} disabled={isAiProcessing || !aiText.trim()} className="px-4 py-2 bg-purple-600 text-white font-bold rounded-lg shadow-md hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2">
-                                {isAiProcessing ? <Loader2 className="animate-spin w-4 h-4" /> : <ClipboardPaste className="w-4 h-4" />} Autocompletar
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="app-card w-full max-w-lg overflow-hidden animate-in zoom-in-95">
+                        <div className="app-modal-header">
+                            <h3 className="flex items-center gap-2 text-base font-bold">
+                                <Sparkles className="h-4 w-4" /> Extracción inteligente
+                            </h3>
+                            <button onClick={() => setShowAiModal(false)} className="rounded-lg p-1 text-white/70 hover:bg-white/10 hover:text-white" aria-label="Cerrar">
+                                ✕
                             </button>
+                        </div>
+                        <div className="p-5">
+                            <p className="mb-3 text-sm text-slate-500">Pega el reporte de WhatsApp y la IA completará las casillas automáticamente.</p>
+                            <textarea className="app-input h-40 resize-none font-mono text-xs" placeholder="PEGA AQUÍ EL TEXTO..." value={aiText} onChange={e => setAiText(e.target.value)} />
+                            <div className="mt-4 flex justify-end gap-3">
+                                <button onClick={() => setShowAiModal(false)} className="app-btn-secondary">Cancelar</button>
+                                <button onClick={handleAiExtraction} disabled={isAiProcessing || !aiText.trim()} className="app-btn-primary">
+                                    {isAiProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardPaste className="h-4 w-4" />} Autocompletar
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
