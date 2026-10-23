@@ -11,6 +11,7 @@ import type { ServicioJefeOperativo } from '@/types/jefeOperativo';
 import { ClipboardList, Clock, User, LogOut, Loader2, ShieldAlert, History, ExternalLink } from 'lucide-react';
 import { AbrirJefeOperativoModal } from '@/components/jefe-operativo/AbrirJefeOperativoModal';
 import { AccessBlocked } from '@/components/auth/AccessBlocked';
+import { AlertaCierreAutomatico } from '@/components/supervisor/AlertaCierreAutomatico';
 
 export default function HomePage() {
   const router = useRouter();
@@ -174,6 +175,11 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="space-y-8">
+            <AlertaCierreAutomatico
+              fechaInicio={servicioActivo?.apertura.fechaHora}
+              estado={servicioActivo?.estado}
+            />
+
             <div className="flex flex-col justify-between gap-4 rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm sm:flex-row sm:items-center">
               <div className="flex items-start gap-3">
                 <div className="rounded-xl bg-indigo-50 p-3 text-indigo-600">

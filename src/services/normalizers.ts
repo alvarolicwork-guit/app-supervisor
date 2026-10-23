@@ -148,6 +148,14 @@ export function normalizarServicioSupervisor(
     raw.expiresAt,
     new Date(createdAt.getTime() + 7 * 24 * 60 * 60 * 1000)
   );
+  const alertaCierreEn = toDateSafe(
+    raw.alertaCierreEn,
+    new Date(aperturaFecha.getTime() + 25 * 60 * 60 * 1000)
+  );
+  const cierreProgramadoEn = toDateSafe(
+    raw.cierreProgramadoEn,
+    new Date(aperturaFecha.getTime() + 26 * 60 * 60 * 1000)
+  );
 
   const supervisorActualRaw = isRecord(aperturaRaw.supervisorActual)
     ? aperturaRaw.supervisorActual
@@ -187,5 +195,7 @@ export function normalizarServicioSupervisor(
     cierre,
     createdAt,
     expiresAt,
+    alertaCierreEn,
+    cierreProgramadoEn,
   } as ServicioSupervisor;
 }

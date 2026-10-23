@@ -34,10 +34,14 @@ export interface ServicioSupervisor {
         informeFinal?: string;
         ajusteTotales?: boolean;
         justificacionAjuste?: string;
+        tipoCierre?: 'MANUAL' | 'AUTOMATICO';
+        motivoCierre?: string;
     };
 
     createdAt: Date;
     expiresAt: Date;
+    alertaCierreEn?: Date;
+    cierreProgramadoEn?: Date;
 }
 
 /**
@@ -54,7 +58,9 @@ export async function abrirServicioSupervisor(
 ): Promise<string> {
 
     const expiresAt = new Date(data.fechaHora);
-    expiresAt.setDate(expiresAt.getDate() + 7); // Expira en 7 días
+    expiresAt.setDate(expiresAt.getDate() + 7); // Retención posterior al cierre
+    const alertaCierreEn = new Date(data.fechaHora.getTime() + 25 * 60 * 60 * 1000);
+    const cierreProgramadoEn = new Date(data.fechaHora.getTime() + 26 * 60 * 60 * 1000);
 
     const servicio: Omit<ServicioSupervisor, 'id'> = {
         uidSupervisor: uid,
@@ -67,6 +73,8 @@ export async function abrirServicioSupervisor(
         serviciosExtraordinarios: [],
         createdAt: data.fechaHora,
         expiresAt,
+        alertaCierreEn,
+        cierreProgramadoEn,
     };
 
     const lockRef = doc(db, 'servicios_activos', `${uid}_supervisor`);
@@ -103,6 +111,8 @@ export async function abrirServicioSupervisor(
             },
             createdAt: serverTimestamp(),
             expiresAt: Timestamp.fromDate(expiresAt),
+            alertaCierreEn: Timestamp.fromDate(alertaCierreEn),
+            cierreProgramadoEn: Timestamp.fromDate(cierreProgramadoEn),
             updatedAt: serverTimestamp(),
             updatedBy: uid,
         });
@@ -216,6 +226,7 @@ export async function cerrarServicioSupervisor(servicioId: string, datosCierre: 
                 informeFinal: datosCierre.informeFinal || '',
                 ajusteTotales: Boolean(datosCierre.ajusteTotales),
                 justificacionAjuste: datosCierre.justificacionAjuste || '',
+                tipoCierre: 'MANUAL',
             },
             expiresAt: Timestamp.fromDate(expiresAt),
             updatedAt: serverTimestamp(),

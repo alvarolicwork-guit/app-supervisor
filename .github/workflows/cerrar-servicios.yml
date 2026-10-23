@@ -1,0 +1,37 @@
+name: Cerrar servicios vencidos
+
+on:
+  schedule:
+    # GitHub Actions no garantiza el minuto exacto; puede demorar algunos minutos.
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cerrar-servicios-vencidos
+  cancel-in-progress: false
+
+jobs:
+  cerrar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Cerrar servicios que cumplieron 26 horas
+        run: node scripts/cerrar-servicios-vencidos.mjs --apply
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_PROJECT_ID: registro-de-supervisor

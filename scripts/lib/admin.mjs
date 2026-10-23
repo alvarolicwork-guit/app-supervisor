@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import dotenv from 'dotenv';
-import { applicationDefault, getApps, initializeApp } from 'firebase-admin/app';
+import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 
@@ -14,14 +14,25 @@ if (!projectId) {
     process.exit(1);
 }
 
-if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+const serviceAccountRaw = process.env.FIREBASE_SERVICE_ACCOUNT?.trim();
+if (!serviceAccountRaw && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
     console.error(
-        'Define GOOGLE_APPLICATION_CREDENTIALS con una cuenta de servicio fuera del repositorio.'
+        'Define FIREBASE_SERVICE_ACCOUNT (JSON o base64) o GOOGLE_APPLICATION_CREDENTIALS.'
     );
     process.exit(1);
 }
 
-const app = getApps()[0] ?? initializeApp({ credential: applicationDefault(), projectId });
+function buildCredential() {
+    if (!serviceAccountRaw) return applicationDefault();
+
+    const json = serviceAccountRaw.startsWith('{')
+        ? serviceAccountRaw
+        : Buffer.from(serviceAccountRaw, 'base64').toString('utf8');
+
+    return cert(JSON.parse(json));
+}
+
+const app = getApps()[0] ?? initializeApp({ credential: buildCredential(), projectId });
 
 export const db = getFirestore(app);
 export const auth = getAuth(app);

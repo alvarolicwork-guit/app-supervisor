@@ -14,6 +14,7 @@ import { ServicioExtraordinario, AperturaServicioExtra, CierreServicioExtra } fr
 import { useAuth } from '@/context/AuthContext';
 import { generarInformeTexto } from '@/utils/reporteSupervisor';
 import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
+import { AlertaCierreAutomatico } from '@/components/supervisor/AlertaCierreAutomatico';
 
 export default function ServicioDashboardPage() {
     const router = useRouter();
@@ -237,6 +238,12 @@ export default function ServicioDashboardPage() {
                             </p>
                         </div>
                     )}
+
+                    <AlertaCierreAutomatico
+                        fechaInicio={servicio?.apertura.fechaHora}
+                        estado={servicio?.estado}
+                        onFinalizar={handleCerrarServicioClick}
+                    />
 
                     {notice && <InlineAlert notice={notice} onClose={() => setNotice(null)} />}
 
