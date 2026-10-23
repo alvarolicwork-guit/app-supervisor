@@ -111,15 +111,15 @@ export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalPr
 
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-2 sm:p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[96vh] flex flex-col overflow-hidden">
+            <div className="app-card flex max-h-[96vh] w-full max-w-2xl flex-col overflow-hidden">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-4 sm:p-6 rounded-t-2xl flex justify-between items-center gap-3">
+                <div className="app-modal-header gap-3 px-5 py-4 sm:px-6">
                     <div className="flex items-center gap-3">
-                        <Sparkles className="w-6 h-6 text-white" />
-                        <h2 className="text-base sm:text-xl font-bold text-white">Auto-completar con IA</h2>
+                        <Sparkles className="h-5 w-5 text-white" />
+                        <h2 className="text-base font-bold sm:text-lg">Auto-completar con IA</h2>
                     </div>
-                    <button onClick={onCancel} className="text-white hover:bg-white/20 p-2 rounded-lg transition-colors">
-                        <X className="w-6 h-6" />
+                    <button onClick={onCancel} className="rounded-lg p-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white" aria-label="Cerrar">
+                        <X className="h-5 w-5" />
                     </button>
                 </div>
 
@@ -128,8 +128,8 @@ export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalPr
                     <button
                         onClick={() => setActiveTab('whatsapp')}
                         className={`flex-1 min-w-[140px] px-4 sm:px-6 py-3 sm:py-4 font-medium transition-all ${activeTab === 'whatsapp'
-                                ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-                                : 'text-gray-600 hover:bg-gray-50'
+                                ? 'border-b-2 border-indigo-600 bg-indigo-50 text-indigo-700'
+                                : 'text-slate-600 hover:bg-slate-50'
                             }`}
                     >
                         <div className="flex items-center justify-center gap-2">
@@ -141,8 +141,8 @@ export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalPr
                     <button
                         onClick={() => setActiveTab('pdf')}
                         className={`flex-1 min-w-[90px] px-4 sm:px-6 py-3 sm:py-4 font-medium transition-all ${activeTab === 'pdf'
-                                ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-                                : 'text-gray-600 hover:bg-gray-50'
+                                ? 'border-b-2 border-indigo-600 bg-indigo-50 text-indigo-700'
+                                : 'text-slate-600 hover:bg-slate-50'
                             }`}
                     >
                         <div className="flex items-center justify-center gap-2">
@@ -259,12 +259,12 @@ export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalPr
                     {/* Disambiguation UI */}
                     {extractedResult && extractedResult.dudas && (
                         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                <h3 className="font-bold text-blue-900 mb-2 flex items-center gap-2">
-                                    <Sparkles className="w-5 h-5" />
-                                    Clarificación Necesaria
+                            <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+                                <h3 className="mb-2 flex items-center gap-2 font-bold text-indigo-900">
+                                    <Sparkles className="h-5 w-5" />
+                                    Clarificación necesaria
                                 </h3>
-                                <p className="text-sm text-blue-800">
+                                <p className="text-sm text-indigo-800">
                                     La IA ha encontrado múltiples opciones para algunos campos. Por favor, selecciona la opción correcta:
                                 </p>
                             </div>
@@ -305,10 +305,10 @@ export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalPr
 
                     {/* Success Preview */}
                     {loading && (
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-                            <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-2" />
-                            <p className="text-sm text-blue-800 font-medium">Procesando con IA...</p>
-                            <p className="text-xs text-blue-600 mt-1">Esto puede tomar unos segundos</p>
+                        <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-center">
+                            <Loader2 className="mx-auto mb-2 h-8 w-8 animate-spin text-indigo-600" />
+                            <p className="text-sm font-medium text-indigo-800">Procesando con IA...</p>
+                            <p className="mt-1 text-xs text-indigo-600">Esto puede tomar unos segundos.</p>
                         </div>
                     )}
                 </div>
@@ -324,7 +324,7 @@ export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalPr
                                 onCancel();
                             }
                         }}
-                        className="flex-1 px-6 py-3 border border-gray-300 rounded-lg font-medium hover:bg-gray-100 transition-colors"
+                        className="app-btn-secondary flex-1"
                         disabled={loading}
                     >
                         {extractedResult ? 'Atrás' : 'Cancelar'}
@@ -333,7 +333,7 @@ export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalPr
                     {extractedResult ? (
                         <button
                             onClick={handleConfirmDoubts}
-                            className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg flex items-center justify-center gap-2"
+                            className="app-btn-primary flex-1"
                         >
                             <CheckCircle2 className="w-5 h-5" />
                             Confirmar Selección
@@ -342,7 +342,7 @@ export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalPr
                         <button
                             onClick={handleExtract}
                             disabled={loading || (activeTab === 'whatsapp' && !text.trim()) || ((activeTab === 'pdf' || activeTab === 'image') && !file)}
-                            className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            className="app-btn-primary flex-1"
                         >
                             {loading ? (
                                 <>
