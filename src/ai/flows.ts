@@ -3,8 +3,13 @@ import { googleAI } from '@genkit-ai/googleai';
 
 const apiKey = process.env.GOOGLE_AI_API_KEY;
 // Gemini 2.0 dejó de estar disponible para las claves nuevas; 2.5 Flash es el
-// modelo estable que usa la cuenta. Se puede sobreescribir con GENKIT_MODEL.
-const model = process.env.GENKIT_MODEL || 'googleai/gemini-2.5-flash';
+// modelo estable que usa la cuenta. Se puede sobreescribir con GENKIT_MODEL,
+// pero ignoramos una configuración antigua que apunte a 2.0.
+const configuredGenkitModel = process.env.GENKIT_MODEL;
+const model =
+  configuredGenkitModel && !configuredGenkitModel.includes('gemini-2.0')
+    ? configuredGenkitModel
+    : 'googleai/gemini-2.5-flash';
 
 // No lanzar en el ámbito superior: la app debe compilar y arrancar aunque la
 // clave de IA no esté configurada. Las server actions devuelven un error

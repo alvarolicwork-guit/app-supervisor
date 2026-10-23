@@ -6,7 +6,10 @@ export async function generateContentDirect(prompt: string, fileData?: { base64:
     }
     // Orden de preferencia. Gemini 2.0 ya no aparece en la lista de modelos
     // disponibles para esta clave; se mantiene 2.5 Flash como modelo estable.
-    const configuredModel = process.env.GEMINI_MODEL;
+    const configuredModel =
+        process.env.GEMINI_MODEL && !process.env.GEMINI_MODEL.includes('gemini-2.0')
+            ? process.env.GEMINI_MODEL
+            : undefined;
     const MODELS_TO_TRY = Array.from(
         new Set(
             [
