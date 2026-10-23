@@ -4,12 +4,11 @@ import { googleAI } from '@genkit-ai/googleai';
 const apiKey = process.env.GOOGLE_AI_API_KEY;
 const model = process.env.GENKIT_MODEL || 'googleai/gemini-2.0-flash';
 
-if (!apiKey) {
-  throw new Error('❌ GOOGLE_AI_API_KEY no está configurada. Crea un archivo .env.local con tu API key.');
-}
-
+// No lanzar en el ámbito superior: la app debe compilar y arrancar aunque la
+// clave de IA no esté configurada. Las server actions devuelven un error
+// controlado cuando se intenta usar el modelo sin clave.
 const ai = genkit({
-  plugins: [googleAI({ apiKey })],
+  plugins: apiKey ? [googleAI({ apiKey })] : [],
   model,
 });
 

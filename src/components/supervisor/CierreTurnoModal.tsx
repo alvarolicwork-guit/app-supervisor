@@ -1,28 +1,67 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { X, Save, LogOut } from 'lucide-react';
+import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
+import type { DatosUnidadRegistrada } from './ResumenTurno';
 
 interface CierreTurnoModalProps {
+    registros?: DatosUnidadRegistrada[];
     onClose: () => void;
     onContinuar: (data: {
         entregaServicio: string;
         casosRutinarios: number;
         casosRelevantes: number;
+        ajusteTotales?: boolean;
+        justificacionAjuste?: string;
     }) => void;
 }
 
-export function CierreTurnoModal({ onClose, onContinuar }: CierreTurnoModalProps) {
+export function CierreTurnoModal({ registros = [], onClose, onContinuar }: CierreTurnoModalProps) {
+    const totalesRegistrados = useMemo(() => {
+        return registros.reduce(
+            (acc, registro) => {
+                acc.rutina += Number(registro.servicio?.rutina || 0);
+                acc.relevantes += registro.servicio?.relevantes?.length || 0;
+                return acc;
+            },
+            { rutina: 0, relevantes: 0 }
+        );
+    }, [registros]);
+
     const [entregaServicio, setEntregaServicio] = useState('');
-    const [casosRutinarios, setCasosRutinarios] = useState('');
-    const [casosRelevantes, setCasosRelevantes] = useState('');
+    const [casosRutinarios, setCasosRutinarios] = useState(String(totalesRegistrados.rutina));
+    const [casosRelevantes, setCasosRelevantes] = useState(String(totalesRegistrados.relevantes));
+    const [justificacionAjuste, setJustificacionAjuste] = useState('');
+    const [notice, setNotice] = useState<InlineAlertData | null>(null);
+
+    const rutinaNum = parseInt(casosRutinarios) || 0;
+    const relevantesNum = parseInt(casosRelevantes) || 0;
+    const hayAjuste =
+        rutinaNum !== totalesRegistrados.rutina || relevantesNum !== totalesRegistrados.relevantes;
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (rutinaNum < 0 || relevantesNum < 0) {
+            setNotice({ type: 'error', message: 'Los totales no pueden ser negativos.' });
+            return;
+        }
+
+        if (hayAjuste && !justificacionAjuste.trim()) {
+            setNotice({
+                type: 'error',
+                message: 'Los totales no coinciden con los registros. Escribe una justificación del ajuste.',
+            });
+            return;
+        }
+
         onContinuar({
             entregaServicio,
-            casosRutinarios: parseInt(casosRutinarios) || 0,
-            casosRelevantes: parseInt(casosRelevantes) || 0,
+            casosRutinarios: rutinaNum,
+            casosRelevantes: relevantesNum,
+            ajusteTotales: hayAjuste,
+            justificacionAjuste: hayAjuste ? justificacionAjuste.trim() : undefined,
         });
     };
 
@@ -40,6 +79,8 @@ export function CierreTurnoModal({ onClose, onContinuar }: CierreTurnoModalProps
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5 overflow-y-auto">
+                    {notice && <InlineAlert notice={notice} onClose={() => setNotice(null)} />}
+
                     <div className="space-y-4">
                         <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-1">
@@ -85,12 +126,49 @@ export function CierreTurnoModal({ onClose, onContinuar }: CierreTurnoModalProps
                                 />
                             </div>
                         </div>
+
+                        <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
+                            <p className="font-semibold">
+                                Totales según los {registros.length} registro(s) de unidades:
+                            </p>
+                            <p className="mt-1">
+                                {totalesRegistrados.rutina} caso(s) rutinario(s) y{' '}
+                                {totalesRegistrados.relevantes} caso(s) relevante(s).
+                            </p>
+                            {hayAjuste && (
+                                <p className="mt-2 font-semibold text-amber-700">
+                                    Los valores ingresados no coinciden con los registros. El ajuste quedará
+                                    registrado en el informe.
+                                </p>
+                            )}
+                        </div>
+
+                        {hayAjuste && (
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                                    Justificación del ajuste
+                                </label>
+                                <textarea
+                                    required
+                                    value={justificacionAjuste}
+                                    onChange={(e) => setJustificacionAjuste(e.target.value.slice(0, 300))}
+                                    placeholder="Explica por qué los totales difieren de los registros..."
+                                    rows={2}
+                                    maxLength={300}
+                                    className="w-full px-4 py-3 rounded-xl border border-amber-300 bg-amber-50 focus:ring-2 focus:ring-amber-400 focus:border-amber-400 transition-all outline-none text-sm"
+                                />
+                                <p className="text-right text-[10px] text-gray-400 mt-1">
+                                    {justificacionAjuste.length}/300
+                                </p>
+                            </div>
+                        )}
                     </div>
 
                     <div className="pt-2">
                         <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4">
                             <p className="text-xs text-blue-800">
-                                Al finalizar, se generará un reporte completo y el servicio quedará en modo "Solo Lectura".
+                                Al finalizar, se generará un reporte completo y el servicio quedará en modo
+                                &quot;Solo Lectura&quot;.
                             </p>
                         </div>
                         <div className="flex flex-col-reverse sm:flex-row gap-3">

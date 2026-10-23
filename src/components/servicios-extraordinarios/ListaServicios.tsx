@@ -8,7 +8,6 @@ interface ListaServiciosExtraordinariosProps {
     soloLectura: boolean;
     onAbrirNuevo: () => void;
     onCerrarServicio: (servicioId: string) => void;
-    onVerDetalle: (servicioId: string) => void;
 }
 
 export function ListaServiciosExtraordinarios({
@@ -16,7 +15,6 @@ export function ListaServiciosExtraordinarios({
     soloLectura,
     onAbrirNuevo,
     onCerrarServicio,
-    onVerDetalle
 }: ListaServiciosExtraordinariosProps) {
 
     const serviciosActivos = servicios.filter(s => s.estado === 'abierto');
@@ -91,12 +89,6 @@ export function ListaServiciosExtraordinarios({
                                         </div>
                                     </div>
                                     <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
-                                        <button
-                                            onClick={() => onVerDetalle(servicio.id)}
-                                            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors w-full"
-                                        >
-                                            Ver Detalle
-                                        </button>
                                         {!soloLectura && (
                                             <button
                                                 onClick={() => onCerrarServicio(servicio.id)}
@@ -147,12 +139,9 @@ export function ListaServiciosExtraordinarios({
                                             <p>Cerrado: {servicio.cierre && formatFecha(servicio.cierre.fechaCierre)}</p>
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={() => onVerDetalle(servicio.id)}
-                                        className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors w-full sm:w-auto"
-                                    >
-                                        Ver Detalle
-                                    </button>
+                                    <span className="px-4 py-2 text-sm text-gray-500">
+                                        Servicio cerrado
+                                    </span>
                                 </div>
                             </div>
                         ))}

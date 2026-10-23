@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Building2, MapPin, ChevronRight, ArrowLeft } from 'lucide-react';
 import { FormularioUnidad } from './FormularioUnidad';
 import { ResumenTurno, DatosUnidadRegistrada } from './ResumenTurno';
-import { useAuth } from '@/context/AuthContext';
+import { getServicioById } from '@/services/servicioSupervisorService';
 import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
 
 type Unidad = {
@@ -66,14 +66,18 @@ const UNIDADES_FIJAS: Unidad[] = [
 interface UnidadesControlProps {
     servicioId: string;
     soloLectura?: boolean;
+    registrosIniciales?: DatosUnidadRegistrada[];
 }
 
-export function UnidadesControl({ servicioId, soloLectura = false }: UnidadesControlProps) {
+export function UnidadesControl({
+    servicioId,
+    soloLectura = false,
+    registrosIniciales,
+}: UnidadesControlProps) {
     // Si selectedParent está set, mostramos sus hijos.
     // Si selectedUnidad está set (y es hoja o hijo), mostramos el formulario.
     const [selectedParent, setSelectedParent] = useState<Unidad | null>(null);
     const [selectedUnidad, setSelectedUnidad] = useState<string | null>(null);
-    const { user } = useAuth();
 
     // Estado para el Dashboard (Registros de la sesión actual)
     const [registrosSesion, setRegistrosSesion] = useState<DatosUnidadRegistrada[]>([]);
@@ -81,28 +85,26 @@ export function UnidadesControl({ servicioId, soloLectura = false }: UnidadesCon
     const [notice, setNotice] = useState<InlineAlertData | null>(null);
 
     const cargarRegistros = useCallback(async () => {
-        if (!user) return;
         setLoading(true);
         try {
-            // Cargar de Firestore
-            const { getServicioActivo } = await import('@/services/servicioSupervisorService');
-            const servicio = await getServicioActivo(user.uid);
-
-            if (servicio && servicio.id === servicioId) {
-                setRegistrosSesion(servicio.controlInstalaciones || []);
+            if (registrosIniciales) {
+                setRegistrosSesion(registrosIniciales);
+                return;
             }
+
+            const servicio = await getServicioById(servicioId);
+            setRegistrosSesion(servicio?.controlInstalaciones ?? []);
         } catch (error) {
             console.error('Error cargando registros:', error);
+            setNotice({ type: 'error', message: 'No se pudieron cargar los registros del servicio.' });
         } finally {
             setLoading(false);
         }
-    }, [user, servicioId]);
+    }, [servicioId, registrosIniciales]);
 
     useEffect(() => {
-        if (user) {
-            void cargarRegistros();
-        }
-    }, [user, cargarRegistros]);
+        void cargarRegistros();
+    }, [cargarRegistros]);
 
     const guardarEnSesion = async (nuevoRegistro: DatosUnidadRegistrada) => {
         // Actualizar estado local inmediatamente

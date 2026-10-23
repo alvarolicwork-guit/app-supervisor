@@ -1,26 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
-import { Shield, Key, Mail, Loader2, AlertTriangle, X } from 'lucide-react';
-import { userService } from '@/services/userService';
-import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
+import { Shield, Key, Mail, Loader2, AlertTriangle } from 'lucide-react';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const [notice, setNotice] = useState<InlineAlertData | null>(null);
     const router = useRouter();
-    const allowDevAdminSetup = process.env.NEXT_PUBLIC_ENABLE_DEV_ADMIN_SETUP === 'true' && process.env.NODE_ENV !== 'production';
-
-    // Dev Modal State
-    const [showDevModal, setShowDevModal] = useState(false);
-    const [devEmail, setDevEmail] = useState('');
-    const [devPass, setDevPass] = useState('');
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -39,57 +30,6 @@ export default function LoginPage() {
             } else {
                 setError('Error al iniciar sesión: ' + err.message);
             }
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    /**
-     * FUNCIÓN TEMPORAL PARA CREAR EL PRIMER ADMIN
-     */
-    const handleFirstAdminSetup = async (e: React.FormEvent) => {
-        e.preventDefault();
-
-        if (!allowDevAdminSetup) {
-            setError('La configuración inicial está deshabilitada en este entorno.');
-            return;
-        }
-
-        if (!devEmail || !devPass) {
-            setNotice({ type: 'error', message: 'Completa ambos campos.' });
-            return;
-        }
-
-        if (devPass.length < 6) {
-            setNotice({ type: 'error', message: 'La contraseña debe tener al menos 6 caracteres.' });
-            return;
-        }
-
-        setLoading(true);
-        try {
-            // 1. Crear usuario en Auth
-            const userCredential = await createUserWithEmailAndPassword(auth, devEmail, devPass);
-            const user = userCredential.user;
-
-            // 2. Crear perfil Admin en Firestore
-            await userService.createUserProfile(user.uid, {
-                email: devEmail,
-                role: 'admin',
-                nombreCompleto: 'Administrador Sistema',
-                grado: 'Admin',
-                isActive: true,
-                createdAt: new Date()
-            });
-
-            setNotice({ type: 'success', message: 'Usuario administrador creado exitosamente. Ahora inicia sesión.' });
-            setEmail(devEmail);
-            setPassword('');
-            setShowDevModal(false);
-        } catch (error) {
-            setNotice({
-                type: 'error',
-                message: `Error al crear administrador: ${error instanceof Error ? error.message : 'error desconocido'}`,
-            });
         } finally {
             setLoading(false);
         }
@@ -117,8 +57,6 @@ export default function LoginPage() {
                             <p className="text-sm text-red-200">{error}</p>
                         </div>
                     )}
-
-                    {notice && <InlineAlert notice={notice} onClose={() => setNotice(null)} />}
 
                     <form onSubmit={handleLogin} className="space-y-4">
                         <div className="space-y-2">
@@ -164,70 +102,8 @@ export default function LoginPage() {
                         </button>
                     </form>
 
-                    {allowDevAdminSetup && (
-                        <div className="mt-8 pt-6 border-t border-white/5 text-center">
-                            <button
-                                onClick={() => setShowDevModal(true)}
-                                className="text-xs text-slate-600 hover:text-slate-400 transition-colors underline cursor-pointer"
-                            >
-                                ¿Configuración inicial? (Solo desarrollo)
-                            </button>
-                        </div>
-                    )}
                 </div>
             </div>
-
-            {/* DEV SETUP MODAL */}
-            {allowDevAdminSetup && showDevModal && (
-                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-slate-800 border border-slate-700 p-6 rounded-2xl w-full max-w-sm shadow-2xl animate-in zoom-in-95">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-bold text-white">Crear Primer Administrador</h3>
-                            <button onClick={() => setShowDevModal(false)} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
-                        </div>
-
-                        <form onSubmit={handleFirstAdminSetup} className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-400 mb-1">Email Admin</label>
-                                <input
-                                    type="email"
-                                    required
-                                    value={devEmail}
-                                    onChange={e => setDevEmail(e.target.value)}
-                                    className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                    placeholder="admin@sistema.com"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-400 mb-1">Password</label>
-                                <input
-                                    type="password"
-                                    required
-                                    value={devPass}
-                                    onChange={e => setDevPass(e.target.value)}
-                                    className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none"
-                                    placeholder="min 6 chars"
-                                />
-                            </div>
-                            <div className="flex gap-2 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowDevModal(false)}
-                                    className="flex-1 py-2 text-slate-400 hover:text-white transition-colors border border-slate-600 rounded-lg"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="flex-1 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-500 transition-colors"
-                                >
-                                    Crear Admin
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

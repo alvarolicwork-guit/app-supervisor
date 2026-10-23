@@ -290,12 +290,18 @@ export default function JefeOperativoDashboardPage() {
     const handleConfirmarCierre = async (datos: CierreServicioExtra) => {
         if (!servicio) return;
 
+        const idToken = await user?.getIdToken();
+        if (!idToken) {
+            setNotice({ type: 'error', message: 'Sesión no válida. Vuelve a iniciar sesión.' });
+            return;
+        }
+
         try {
             let tareasEjecutadas = '';
             const tareasOriginales = servicio.apertura.tareas || '';
 
             if (tareasOriginales.trim()) {
-                const textoIA = await transformarTareasPasadoAction(tareasOriginales);
+                const textoIA = await transformarTareasPasadoAction(idToken, tareasOriginales);
                 tareasEjecutadas = toPastTenseFallback(textoIA || tareasOriginales);
             }
 
@@ -306,7 +312,10 @@ export default function JefeOperativoDashboardPage() {
 
             const reporteWhatsappFinal = buildReporteCierreWhatsapp(servicio, payloadCierre);
             const borradorInforme = buildInformeInstitucionalDraft(servicio, payloadCierre);
-            const informeInstitucionalFinal = await generarInformeInstitucionalIAAction(borradorInforme);
+            const informeInstitucionalFinal = await generarInformeInstitucionalIAAction(
+                idToken,
+                borradorInforme
+            );
 
             payloadCierre.reporteWhatsappFinal = reporteWhatsappFinal;
             payloadCierre.informeInstitucionalFinal = informeInstitucionalFinal || borradorInforme;
@@ -422,6 +431,7 @@ export default function JefeOperativoDashboardPage() {
     }
 
     const servicioActivo = servicio.estado === 'abierto';
+    const puedeEditar = servicioActivo && user?.uid === servicio.uidJefe;
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -465,7 +475,7 @@ export default function JefeOperativoDashboardPage() {
                             </div>
                         </div>
 
-                        {servicioActivo && (
+                        {puedeEditar && (
                             <button
                                 onClick={() => setShowCierreForm(true)}
                                 className="px-6 py-3 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-colors shadow-lg flex items-center justify-center gap-2"
@@ -583,7 +593,7 @@ export default function JefeOperativoDashboardPage() {
                                                      </div>
                                                  </div>
 
-                                                 {servicioActivo && !incorporado && (
+                                                 {puedeEditar && !incorporado && (
                                                      <div>
                                                          {isUpdating ? (
                                                              <div className="flex items-center gap-2 animate-in slide-in-from-right-2">

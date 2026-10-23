@@ -84,6 +84,51 @@ await testEnv.withSecurityRulesDisabled(async (context) => {
     serviciosExtraordinarios: [],
     createdAt: nowTs,
     expiresAt: laterTs,
+    updatedAt: nowTs,
+    updatedBy: supervisorUid,
+  });
+
+  await setDoc(doc(db, 'servicios_jefe_operativo', 'jefe_own'), {
+    uidJefe: supervisorUid,
+    estado: 'abierto',
+    apertura: {
+      nroPlanOperaciones: 'PLAN-001',
+      tipoServicio: 'OPERATIVO',
+      fechaApertura: nowTs,
+      novedadesFormacion: {
+        personalFormo: 10,
+        personalFalto: { cantidad: 1, lista: [{ gradoNombre: 'Sgto. Falta' }] },
+        personalPermiso: { cantidad: 0, lista: [] },
+        observacionesUniforme: [],
+      },
+    },
+    createdAt: nowTs,
+    updatedAt: nowTs,
+    updatedBy: supervisorUid,
+  });
+
+  await setDoc(doc(db, 'servicios_supervisor', 'svc_closed'), {
+    uidSupervisor: supervisorUid,
+    estado: 'cerrado',
+    apertura: {
+      nroMemorandum: 'MEM-CERRADO',
+      fechaHora: nowTs,
+      supervisorActual: { grado: 'Sgto.', nombreCompleto: 'Supervisor Uno' },
+      supervisorRelevo: { grado: 'Sgto.', nombreCompleto: 'Supervisor Relevo' },
+    },
+    controlInstalaciones: [],
+    serviciosExtraordinarios: [],
+    createdAt: nowTs,
+    expiresAt: laterTs,
+    updatedAt: nowTs,
+    updatedBy: supervisorUid,
+    cierre: {
+      fechaHora: nowTs,
+      entregaServicio: 'Sgto. Relevo',
+      casosRutinarios: 1,
+      casosRelevantes: 0,
+      informeFinal: 'Informe cerrado',
+    },
   });
 });
 
@@ -123,6 +168,8 @@ await check('Supervisor can create own servicio_supervisor with valid shape', as
       serviciosExtraordinarios: [],
       createdAt: nowTs,
       expiresAt: laterTs,
+      updatedAt: nowTs,
+      updatedBy: supervisorUid,
     })
   );
 });
@@ -139,6 +186,8 @@ await check('Supervisor cannot create servicio_supervisor for another uid', asyn
       serviciosExtraordinarios: [],
       createdAt: nowTs,
       expiresAt: laterTs,
+      updatedAt: nowTs,
+      updatedBy: supervisorUid,
     })
   );
 });
@@ -158,6 +207,80 @@ await check('Supervisor can update controlInstalaciones preserving immutable fie
       createdAt: nowTs,
       expiresAt: laterTs,
       estado: 'abierto',
+      updatedAt: nowTs,
+      updatedBy: supervisorUid,
+    })
+  );
+});
+
+await check('Supervisor can close own open service', async () => {
+  await assertSucceeds(
+    updateDoc(doc(supervisorDb, 'servicios_supervisor', 'svc_own'), {
+      estado: 'cerrado',
+      cierre: {
+        fechaHora: nowTs,
+        entregaServicio: 'Sgto. Relevo',
+        casosRutinarios: 2,
+        casosRelevantes: 0,
+        informeFinal: 'Informe',
+      },
+      expiresAt: laterTs,
+      updatedAt: nowTs,
+      updatedBy: supervisorUid,
+    })
+  );
+});
+
+await check('Supervisor cannot reopen a closed service', async () => {
+  await assertFails(
+    updateDoc(doc(supervisorDb, 'servicios_supervisor', 'svc_closed'), {
+      estado: 'abierto',
+      updatedAt: nowTs,
+      updatedBy: supervisorUid,
+    })
+  );
+});
+
+await check('Jefe Operativo can register a late arrival', async () => {
+  await assertSucceeds(
+    updateDoc(doc(supervisorDb, 'servicios_jefe_operativo', 'jefe_own'), {
+      'apertura.novedadesFormacion.personalFalto.lista': [
+        { gradoNombre: 'Sgto. Falta', horaIncorporacion: '08:30' },
+      ],
+      updatedAt: nowTs,
+      updatedBy: supervisorUid,
+    })
+  );
+});
+
+await check('Jefe Operativo cannot change the plan identity', async () => {
+  await assertFails(
+    updateDoc(doc(supervisorDb, 'servicios_jefe_operativo', 'jefe_own'), {
+      'apertura.nroPlanOperaciones': 'PLAN-ALTERADO',
+      updatedAt: nowTs,
+      updatedBy: supervisorUid,
+    })
+  );
+});
+
+await check('Supervisor can create own active service lock', async () => {
+  await assertSucceeds(
+    setDoc(doc(supervisorDb, 'servicios_activos', `${supervisorUid}_supervisor`), {
+      uid: supervisorUid,
+      tipo: 'supervisor',
+      servicioId: 'svc_own',
+      createdAt: nowTs,
+    })
+  );
+});
+
+await check('Supervisor cannot create a foreign active service lock', async () => {
+  await assertFails(
+    setDoc(doc(otherSupervisorDb, 'servicios_activos', `${supervisorUid}_supervisor`), {
+      uid: supervisorUid,
+      tipo: 'supervisor',
+      servicioId: 'svc_own',
+      createdAt: nowTs,
     })
   );
 });

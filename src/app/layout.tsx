@@ -10,8 +10,8 @@ const sourceCodePro = Source_Code_Pro({
 });
 
 export const metadata: Metadata = {
-  title: "Novedades Policiales",
-  description: "App para el registro de novedades policiales",
+  title: "App Supervisor",
+  description: "Registro y control de novedades y servicios policiales",
 };
 
 export default function RootLayout({

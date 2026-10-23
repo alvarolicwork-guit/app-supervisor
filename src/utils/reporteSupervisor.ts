@@ -1,4 +1,4 @@
-import { ServicioSupervisor } from '@/services/servicioSupervisorService';
+import type { ServicioSupervisor } from '@/services/servicioSupervisorService';
 
 export function generarInformeTexto(
     servicio: ServicioSupervisor,
@@ -77,24 +77,36 @@ export function generarInformeTexto(
     if (servicio.serviciosExtraordinarios && servicio.serviciosExtraordinarios.length > 0) {
         servicio.serviciosExtraordinarios.forEach((s: any, index) => {
             const plan = s.apertura.nroPlanOperaciones || 'S/N';
-            const jefe = s.apertura.jefeOperativo
-                ? `${s.apertura.jefeOperativo.grado} ${s.apertura.jefeOperativo.nombreCompleto}`
-                : 'Sin Jefe Operativo';
+            const jefeRaw = s.apertura.jefeOperativo;
+            const jefe = typeof jefeRaw === 'string'
+                ? jefeRaw.trim()
+                : jefeRaw && typeof jefeRaw === 'object'
+                    ? [jefeRaw.grado, jefeRaw.nombreCompleto].filter(Boolean).join(' ').trim()
+                    : '';
+            const jefeTexto = jefe || 'Sin Jefe Operativo';
 
-            // Novedades
-            let novedades = 'Sin novedad de importancia';
-            // Buscamos novedades especificas
-            /*
-             [referir novedades del personal atrasados, faltantes y novedades del uso de uniforme]
-             El objeto CierreServicioExtra podría tener novedadesPersonal.
-            */
-            if (s.cierre?.novedadesPersonal?.tipo !== 'sin_novedad' && s.cierre?.novedadesPersonal?.descripcion) {
-                novedades = s.cierre.novedadesPersonal.descripcion;
+            const novedadesCierre = s.cierre?.novedades;
+            const casosCierre = Array.isArray(novedadesCierre?.casos) ? novedadesCierre.casos : [];
+            const partesNovedades: string[] = [];
+
+            if (casosCierre.length > 0) {
+                partesNovedades.push(
+                    casosCierre
+                        .map((c: any) => {
+                            const hora = c.hora ? ` (${c.hora})` : '';
+                            return `${c.tipo || 'Caso'}${hora}: ${c.detalle || ''}`.trim();
+                        })
+                        .join('; ')
+                );
             }
-            // Tambien resultados
-            if (s.cierre?.novedadesResultados) {
-                novedades += `. Resultados: ${s.cierre.novedadesResultados}`;
+
+            if (novedadesCierre?.observaciones) {
+                partesNovedades.push(`Observaciones: ${novedadesCierre.observaciones}`);
             }
+
+            let novedades = partesNovedades.length > 0
+                ? partesNovedades.join('. ')
+                : 'Sin novedad de importancia';
 
             // Incorporaciones (NUEVO)
             const incorporados = s.apertura.novedadesFormacion?.personalFalto?.lista?.filter((p: any) => p.horaIncorporacion) || [];
@@ -108,7 +120,7 @@ export function generarInformeTexto(
             const vehiculos = s.apertura.vehiculosContemplados || 0;
             const tareasTexto = s.apertura.tareas ? `. Tareas: ${s.apertura.tareas}` : '';
  
-            textoServiciosExtra += `${index + 1}. Servicio "${s.apertura.tipoServicio}" (Plan N° ${plan}), con ${efectivos} efectivos, ${motos} motos y ${vehiculos} veh., a cargo del ${jefe}. Novedades: ${novedades}${tareasTexto}.\n`;
+            textoServiciosExtra += `${index + 1}. Servicio "${s.apertura.tipoServicio}" (Plan N° ${plan}), con ${efectivos} efectivos, ${motos} motos y ${vehiculos} veh., a cargo de: ${jefeTexto}. Novedades: ${novedades}${tareasTexto}.\n`;
         });
     } else {
         textoServiciosExtra = 'Sin servicios extraordinarios registrados.\n';

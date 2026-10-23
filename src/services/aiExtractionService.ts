@@ -124,13 +124,13 @@ function parseGeminiResponse(response: string): GeminiExtractionResponse {
 /**
  * Extraer información desde texto plano (WhatsApp)
  */
-export async function extractFromText(text: string): Promise<ExtractionResult> {
+export async function extractFromText(idToken: string, text: string): Promise<ExtractionResult> {
     if (!text.trim()) {
         throw new Error('El texto no puede estar vacío');
     }
 
     const prompt = buildExtractionPrompt(text, 'text');
-    const response = await generateContentAction(prompt);
+    const response = await generateContentAction(idToken, prompt);
     const extracted = parseGeminiResponse(response);
 
     return {
@@ -142,7 +142,15 @@ export async function extractFromText(text: string): Promise<ExtractionResult> {
 /**
  * Extraer información desde PDF
  */
-export async function extractFromPDF(file: File): Promise<ExtractionResult> {
+export async function extractFromPDF(idToken: string, file: File): Promise<ExtractionResult> {
+    const maxBytes = 10 * 1024 * 1024;
+    if (file.size > maxBytes) {
+        throw new Error('El archivo supera el máximo de 10 MB.');
+    }
+    if (file.type && file.type !== 'application/pdf') {
+        throw new Error('El archivo debe ser un PDF.');
+    }
+
     const prompt = buildExtractionPrompt('Extrae la información relevante del Plan de Operaciones en el documento PDF adjunto.', 'pdf');
     
     // Convertir File a base64
@@ -163,7 +171,7 @@ export async function extractFromPDF(file: File): Promise<ExtractionResult> {
         mimeType: file.type || 'application/pdf'
     };
 
-    const response = await generateContentAction(prompt, fileData);
+    const response = await generateContentAction(idToken, prompt, fileData);
     const extracted = parseGeminiResponse(response);
 
     return {
@@ -175,7 +183,8 @@ export async function extractFromPDF(file: File): Promise<ExtractionResult> {
 /**
  * Extraer información desde una Imagen
  */
-export async function extractFromImage(_file: File): Promise<ExtractionResult> {
+export async function extractFromImage(idToken: string, _file: File): Promise<ExtractionResult> {
+    void idToken;
     void _file;
     // TODO: Implementar extracción desde imagen
     throw new Error('La extracción desde imagen estará disponible próximamente. Por favor usa texto o PDF.');

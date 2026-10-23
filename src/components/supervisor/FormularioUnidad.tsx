@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Sparkles, Loader2, ClipboardPaste, Users, AlertTriangle, FileText, Minus, Plus } from 'lucide-react';
 import { extraerDatosCasoAction } from '@/app/actions';
 import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
+import { useAuth } from '@/context/AuthContext';
 import type { DatosUnidadRegistrada } from './ResumenTurno';
 
 interface FormularioUnidadProps {
@@ -73,6 +74,8 @@ const NumberStepper = ({ label, value, onChange, min = 0, max = 999 }: { label: 
 };
 
 export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, onSave, onCancel }: FormularioUnidadProps) {
+    const { user } = useAuth();
+
     // --- Estado Fecha y Hora ---
     const [fechaControl, setFechaControl] = useState(() => {
         const now = new Date();
@@ -115,6 +118,7 @@ export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, 
     const [showAiModal, setShowAiModal] = useState(false);
     const [aiText, setAiText] = useState('');
     const [isAiProcessing, setIsAiProcessing] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [notice, setNotice] = useState<InlineAlertData | null>(null);
 
     // --- Funciones Personal ---
@@ -143,7 +147,13 @@ export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, 
         if (!aiText.trim()) return;
         setIsAiProcessing(true);
         try {
-            const data = await extraerDatosCasoAction(aiText);
+            const idToken = await user?.getIdToken();
+            if (!idToken) {
+                setNotice({ type: 'error', message: 'Sesión no válida. Vuelve a iniciar sesión.' });
+                return;
+            }
+
+            const data = await extraerDatosCasoAction(idToken, aiText);
             if (data) {
                 // Autocompletar el formulario de nuevo caso
                 setNewCase({
@@ -167,31 +177,38 @@ export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, 
         }
     }
 
-    function handleSave() {
-        if (isPenal) {
-            onSave({
+    async function handleSave() {
+        if (soloLectura || isSubmitting) return;
+
+        setIsSubmitting(true);
+        try {
+            if (isPenal) {
+                await onSave({
+                    unidad: nombreUnidad,
+                    fechaHoraControl: fechaControl,
+                    jefeSeguridad: jefeSeguridad.trim(),
+                    personal: { cantidad: cantPersonal, estado: novPersonal, detalles: { faltantes, abandono, arrestados, permisos } },
+                    poblacionPenal: {
+                        total: pplVarones + pplMujeres,
+                        varones: pplVarones,
+                        mujeres: pplMujeres,
+                        detencionDomiciliaria: pplDetencion
+                    },
+                    novedadesTexto: novedadesTexto.trim() || 'Sin novedades registradas.'
+                });
+                return;
+            }
+
+            await onSave({
                 unidad: nombreUnidad,
                 fechaHoraControl: fechaControl,
                 jefeSeguridad: jefeSeguridad.trim(),
                 personal: { cantidad: cantPersonal, estado: novPersonal, detalles: { faltantes, abandono, arrestados, permisos } },
-                poblacionPenal: {
-                    total: pplVarones + pplMujeres,
-                    varones: pplVarones,
-                    mujeres: pplMujeres,
-                    detencionDomiciliaria: pplDetencion
-                },
-                novedadesTexto: novedadesTexto.trim() || 'Sin novedades registradas.'
+                servicio: { rutina: casosRutina, relevantes: casosRelevantes }
             });
-            return;
+        } finally {
+            setIsSubmitting(false);
         }
-
-        onSave({
-            unidad: nombreUnidad,
-            fechaHoraControl: fechaControl,
-            jefeSeguridad: jefeSeguridad.trim(),
-            personal: { cantidad: cantPersonal, estado: novPersonal, detalles: { faltantes, abandono, arrestados, permisos } },
-            servicio: { rutina: casosRutina, relevantes: casosRelevantes }
-        });
     }
 
     return (
@@ -420,11 +437,11 @@ export function FormularioUnidad({ nombreUnidad, unidadId, soloLectura = false, 
             <div className="p-4 bg-gray-50 border-t flex justify-end gap-3">
                 <button onClick={onCancel} className="px-5 py-2.5 rounded-xl text-gray-600 font-medium hover:bg-gray-200">Cancelar</button>
                 <button
-                    onClick={handleSave}
-                    disabled={soloLectura}
+                    onClick={() => void handleSave()}
+                    disabled={soloLectura || isSubmitting}
                     className="px-5 py-2.5 rounded-xl bg-emerald-800 text-white font-bold shadow-lg hover:bg-emerald-900 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    {soloLectura ? 'Solo Lectura' : 'Guardar Registro'}
+                    {soloLectura ? 'Solo Lectura' : isSubmitting ? 'Guardando...' : 'Guardar Registro'}
                 </button>
             </div>
             {/* MODAL IA */}

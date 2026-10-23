@@ -5,21 +5,19 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { AdminDashboard } from '@/components/admin/AdminDashboard';
 import { AbrirServicioModal } from '@/components/supervisor/AbrirServicioModal';
-import { getServicioActivo, getServiciosSupervisor, type ServicioSupervisor } from '@/services/servicioSupervisorService';
-import { getServicioJefeOperativoActivo, getHistorialJefeOperativo } from '@/services/jefeOperativoService';
+import { getServicioActivo, type ServicioSupervisor } from '@/services/servicioSupervisorService';
+import { getServicioJefeOperativoActivo } from '@/services/jefeOperativoService';
 import type { ServicioJefeOperativo } from '@/types/jefeOperativo';
-import { ClipboardList, Clock, CheckCircle, User, LogOut, Loader2, ShieldAlert, History } from 'lucide-react';
+import { ClipboardList, Clock, User, LogOut, Loader2, ShieldAlert, History, ExternalLink } from 'lucide-react';
 import { AbrirJefeOperativoModal } from '@/components/jefe-operativo/AbrirJefeOperativoModal';
+import { AccessBlocked } from '@/components/auth/AccessBlocked';
 
 export default function HomePage() {
   const router = useRouter();
   const { user, userProfile, loading: authLoading, isAdmin, logout } = useAuth();
 
   const [servicioActivo, setServicioActivo] = useState<ServicioSupervisor | null>(null);
-  const [serviciosAnteriores, setServiciosAnteriores] = useState<ServicioSupervisor[]>([]);
-  
   const [jefeOperativoActivo, setJefeOperativoActivo] = useState<ServicioJefeOperativo | null>(null);
-  const [historialJefeOperativo, setHistorialJefeOperativo] = useState<ServicioJefeOperativo[]>([]);
 
   const [showAbrirModal, setShowAbrirModal] = useState(false);
   const [showAbrirJefeOperativoModal, setShowAbrirJefeOperativoModal] = useState(false);
@@ -37,17 +35,13 @@ export default function HomePage() {
     if (!user) return;
     setDataLoading(true);
     try {
-      const [activo, todos, activoJefe, todosJefe] = await Promise.all([
+      const [activo, activoJefe] = await Promise.all([
         getServicioActivo(user.uid),
-        getServiciosSupervisor(user.uid),
         getServicioJefeOperativoActivo(user.uid),
-        getHistorialJefeOperativo(user.uid)
       ]);
 
       setServicioActivo(activo);
-      setServiciosAnteriores(todos.filter(s => s.estado === 'cerrado'));
       setJefeOperativoActivo(activoJefe);
-      setHistorialJefeOperativo(todosJefe.filter((s: ServicioJefeOperativo) => s.estado === 'cerrado'));
     } catch (error) {
       console.error('Error cargando servicios:', error);
     } finally {
@@ -92,20 +86,30 @@ export default function HomePage() {
 
   if (!user) return null; // Redireccionando...
 
+  if (!userProfile) {
+    return (
+      <AccessBlocked
+        title="Perfil no autorizado"
+        message="Tu cuenta existe, pero no tiene un perfil asignado en el sistema. Solicita acceso al administrador."
+        onLogout={logout}
+      />
+    );
+  }
+
+  if (userProfile.isActive === false) {
+    return (
+      <AccessBlocked
+        title="Usuario desactivado"
+        message="Tu perfil está desactivado. Contacta al administrador para restablecer el acceso."
+        onLogout={logout}
+      />
+    );
+  }
+
   // Vista ADMIN
   if (isAdmin) {
     return <AdminDashboard />;
   }
-
-  // Combinar y ordenar historial mixto
-  const historialMixto = [
-    ...serviciosAnteriores.map(s => ({ ...s, tipo: 'SUPERVISOR' })),
-    ...historialJefeOperativo.map(s => ({ ...s, tipo: 'JEFE_OPERATIVO' }))
-  ].sort((a, b) => {
-    const timeA = a.tipo === 'SUPERVISOR' ? (a as any).createdAt.getTime() : (a as any).createdAt.getTime();
-    const timeB = b.tipo === 'SUPERVISOR' ? (b as any).createdAt.getTime() : (b as any).createdAt.getTime();
-    return timeB - timeA;
-  });
 
   // Vista SUPERVISOR / JEFE OPERATIVO
   return (
@@ -128,21 +132,25 @@ export default function HomePage() {
                 <p className="text-xs text-emerald-600 font-semibold uppercase tracking-wider">Módulo Operativo</p>
               </div>
               <div className="h-8 w-px bg-gray-200"></div>
-              <button
-                onClick={() => router.push('/historial')}
+              <a
+                href="/historial"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="sm:hidden p-2 text-gray-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-all"
-                title="Historial"
+                title="Abrir historial en una nueva ventana"
               >
                 <History className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => router.push('/historial')}
+              </a>
+              <a
+                href="/historial"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="hidden sm:flex items-center gap-2 px-3 py-2 text-gray-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-all"
-                title="Ver historial operativo"
+                title="Abrir historial en una nueva ventana"
               >
                 <History className="w-4 h-4" />
                 <span className="text-xs font-semibold">Historial</span>
-              </button>
+              </a>
               <button
                 onClick={() => logout()}
                 className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
@@ -166,7 +174,29 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="space-y-8">
-            
+            <div className="flex flex-col justify-between gap-4 rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm sm:flex-row sm:items-center">
+              <div className="flex items-start gap-3">
+                <div className="rounded-xl bg-indigo-50 p-3 text-indigo-600">
+                  <History className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-gray-900">Historial de Servicios Cerrados</h2>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Consulta, filtra y exporta los servicios de Supervisor y Jefe Operativo.
+                  </p>
+                </div>
+              </div>
+              <a
+                href="/historial"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-indigo-700"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Abrir historial
+              </a>
+            </div>
+
             {/* --- SECCIÓN SUPERVISOR 24H --- */}
             <section>
               <h2 className="text-lg font-bold text-gray-800 mb-4 px-1 border-l-4 border-emerald-500 pl-3">Módulo Supervisor 24 Hrs</h2>
@@ -192,6 +222,16 @@ export default function HomePage() {
                       ABRIR DASHBOARD
                     </button>
                   </div>
+                </div>
+              ) : jefeOperativoActivo ? (
+                <div className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-6 text-center">
+                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                    <ShieldAlert className="h-6 w-6" />
+                  </div>
+                  <h3 className="font-bold text-amber-900">Tienes un servicio de Jefe Operativo activo</h3>
+                  <p className="mt-1 text-sm text-amber-700">
+                    Ciérralo antes de abrir un turno de supervisor.
+                  </p>
                 </div>
               ) : (
                 <div onClick={() => setShowAbrirModal(true)} className="bg-white/50 border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center cursor-pointer hover:bg-emerald-50 hover:border-emerald-400 hover:text-emerald-700 transition-all group">
@@ -230,6 +270,16 @@ export default function HomePage() {
                     </button>
                   </div>
                 </div>
+              ) : servicioActivo ? (
+                <div className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-6 text-center">
+                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                    <Clock className="h-6 w-6" />
+                  </div>
+                  <h3 className="font-bold text-amber-900">Tienes un turno de supervisor activo</h3>
+                  <p className="mt-1 text-sm text-amber-700">
+                    Ciérralo antes de abrir un servicio de Jefe Operativo.
+                  </p>
+                </div>
               ) : (
                 <div onClick={() => setShowAbrirJefeOperativoModal(true)} className="bg-white/50 border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center cursor-pointer hover:bg-indigo-50 hover:border-indigo-400 hover:text-indigo-700 transition-all group">
                   <div className="bg-white w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm group-hover:bg-indigo-100">
@@ -241,54 +291,6 @@ export default function HomePage() {
               )}
             </section>
 
-            {/* Historial Combinado */}
-            {historialMixto.length > 0 && (
-              <div className="pt-8">
-                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2 px-1 border-l-4 border-gray-400 pl-3">
-                  Historial de Servicios Cerrados
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-                  {historialMixto.map((servicio: any, idx) => {
-                    const isSupervisor = servicio.tipo === 'SUPERVISOR';
-                    const titulo = isSupervisor ? servicio.apertura.nroMemorandum : servicio.apertura.nroPlanOperaciones;
-                    const fechaInicio = isSupervisor ? servicio.apertura.fechaHora : servicio.apertura.fechaApertura;
-                    const fechaFin = isSupervisor ? servicio.cierre?.fechaHora : servicio.cierre?.fechaCierre;
-                    const url = isSupervisor ? `/servicio/${servicio.id}` : `/jefe-operativo/${servicio.id}`;
-
-                    return (
-                      <div
-                        key={servicio.id + idx}
-                        onClick={() => router.push(url)}
-                        className={`bg-white rounded-xl border-l-4 ${isSupervisor ? 'border-emerald-500' : 'border-indigo-500'} p-5 hover:shadow-md transition-all cursor-pointer group`}
-                      >
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                              {isSupervisor ? 'Supervisor 24h' : 'Jefe Operativo'}
-                            </span>
-                            <p className="font-bold text-gray-900 text-lg group-hover:text-gray-700 transition-colors">{titulo || 'Sin Título'}</p>
-                          </div>
-                          <span className="px-2 py-1 bg-gray-100 text-gray-500 text-[10px] font-bold uppercase rounded-md flex items-center gap-1">
-                            <CheckCircle className="w-3 h-3" /> Cerrado
-                          </span>
-                        </div>
-
-                        <div className="space-y-1.5 pt-3 border-t border-gray-50">
-                          <div className="flex justify-between text-xs">
-                            <span className="text-gray-500">Inicio</span>
-                            <span className="font-medium text-gray-700">{fechaInicio ? formatFecha(fechaInicio) : '--'}</span>
-                          </div>
-                          <div className="flex justify-between text-xs">
-                            <span className="text-gray-500">Cierre</span>
-                            <span className="font-medium text-gray-700">{fechaFin ? formatFecha(fechaFin) : '--'}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>

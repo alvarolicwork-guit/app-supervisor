@@ -86,6 +86,11 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
     const [lugarFormacion, setLugarFormacion] = useState('');
     const [horaFormacion, setHoraFormacion] = useState('');
     const [horaInstalacion, setHoraInstalacion] = useState('');
+    const [fechaApertura, setFechaApertura] = useState(() => {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        return now.toISOString().slice(0, 16);
+    });
     const [tareas, setTareas] = useState('');
 
     // Novedades Formación
@@ -253,9 +258,9 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
             horaFormacion,
             horaInstalacion,
             tareas,
-            fechaApertura: new Date(),
+            fechaApertura: fechaApertura ? new Date(fechaApertura) : new Date(),
             novedadesFormacion: {
-                personalFormo: parseInt(personalFormo),
+                personalFormo: Number(personalFormo) || 0,
                 personalFalto: {
                     cantidad: finalFaltoCantidad,
                     lista: finalFaltoLista
@@ -383,7 +388,17 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Fecha y Hora *</label>
+                                <input
+                                    type="datetime-local"
+                                    value={fechaApertura}
+                                    onChange={(e) => setFechaApertura(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    required
+                                />
+                            </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Lugar Formación *</label>
                                 <input
@@ -438,7 +453,12 @@ export function AperturaForm({ onSave, onCancel, tipoUsuario = 'supervisor' }: A
                     <div className="bg-gray-50 p-4 rounded-xl space-y-4">
                         <h3 className="font-bold text-lg text-gray-900">👥 Novedades de Formación</h3>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <NumberStepper
+                                label="Personal que Formó"
+                                value={Number(personalFormo) || 0}
+                                onChange={(val) => setPersonalFormo(val.toString())}
+                            />
                             <NumberStepper
                                 label="Faltaron a la Formación"
                                 value={parseInt(personalFaltoCantidad) || 0}

@@ -36,16 +36,21 @@ interface ResumenTurnoProps {
 
 export function ResumenTurno({ totalUnidadesBase, registros }: ResumenTurnoProps) {
     // 1. Cálculos
-    const unidadesSupervisadas = registros.length;
-    const progreso = Math.min(Math.round((unidadesSupervisadas / totalUnidadesBase) * 100), 100);
+    const unidadesUnicas = new Set(registros.map((r) => r.unidad).filter(Boolean));
+    const unidadesSupervisadas = unidadesUnicas.size;
+    const progreso = totalUnidadesBase > 0
+        ? Math.min(Math.round((unidadesSupervisadas / totalUnidadesBase) * 100), 100)
+        : 0;
 
     const totalCasosRelevantes = registros.reduce((acc, r) => acc + (r.servicio?.relevantes?.length || 0), 0);
-    const unidadesConNovedad = registros.filter(r => (r.servicio?.relevantes?.length || 0) > 0).map(r => r.unidad);
+    const unidadesConNovedad = registros
+        .filter((r) => (r.servicio?.relevantes?.length || 0) > 0)
+        .map((r) => r.unidad);
 
     const personal = {
-        faltas: registros.reduce((acc, r) => acc + (r.personal.detalles.faltantes?.length || 0), 0),
-        arrestos: registros.reduce((acc, r) => acc + (r.personal.detalles.arrestados?.length || 0), 0),
-        permisos: registros.reduce((acc, r) => acc + (r.personal.detalles.permisos?.length || 0), 0),
+        faltas: registros.reduce((acc, r) => acc + (r.personal?.detalles?.faltantes?.length || 0), 0),
+        arrestos: registros.reduce((acc, r) => acc + (r.personal?.detalles?.arrestados?.length || 0), 0),
+        permisos: registros.reduce((acc, r) => acc + (r.personal?.detalles?.permisos?.length || 0), 0),
     };
 
     const totalPPL = registros.reduce((acc, r) => acc + (r.poblacionPenal?.total || 0), 0);

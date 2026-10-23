@@ -1,5 +1,5 @@
-import { db } from '@/lib/firebase';
-import { collection, addDoc, updateDoc, doc, getDocs, query, where, orderBy, serverTimestamp, Timestamp, getDoc, runTransaction, deleteDoc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
+import { collection, doc, getDocs, query, where, orderBy, serverTimestamp, Timestamp, getDoc, runTransaction, deleteDoc } from 'firebase/firestore';
 import { ServicioJefeOperativo } from '@/types/jefeOperativo';
 import { AperturaServicioExtra, CierreServicioExtra } from '@/types/servicioExtraordinario';
 import { withFirestoreRetry } from '@/lib/firestoreRetry';
@@ -90,17 +90,52 @@ export async function abrirServicioJefeOperativo(
         updatedAt: new Date(),
     };
 
-    const docRef = await addDoc(collection(db, 'servicios_jefe_operativo'), {
-        ...servicio,
-        apertura: {
-            ...servicio.apertura,
-            fechaApertura: Timestamp.fromDate(servicio.apertura.fechaApertura),
-        },
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+    const lockRef = doc(db, 'servicios_activos', `${uid}_jefe`);
+    const supervisorLockRef = doc(db, 'servicios_activos', `${uid}_supervisor`);
+    const legacyLockRef = doc(db, 'servicios_activos', uid);
+    const servicioRef = doc(collection(db, 'servicios_jefe_operativo'));
+
+    await runTransaction(db, async (transaction) => {
+        const jefeLock = await transaction.get(lockRef);
+        const supervisorLock = await transaction.get(supervisorLockRef);
+        const legacyLock = await transaction.get(legacyLockRef);
+
+        if (supervisorLock.exists()) {
+            throw new Error(
+                'Ya tienes un turno de supervisor activo. Ciérralo antes de abrir un servicio de Jefe Operativo.'
+            );
+        }
+        if (jefeLock.exists()) {
+            throw new Error(
+                'Ya tienes un servicio de Jefe Operativo activo. Ciérralo antes de abrir otro.'
+            );
+        }
+        if (legacyLock.exists()) {
+            throw new Error(
+                'Ya tienes un servicio activo. Ciérralo antes de abrir otro.'
+            );
+        }
+
+        transaction.set(servicioRef, {
+            ...servicio,
+            apertura: {
+                ...servicio.apertura,
+                fechaApertura: Timestamp.fromDate(servicio.apertura.fechaApertura),
+            },
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            updatedBy: uid,
+        });
+
+        transaction.set(lockRef, {
+            uid,
+            tipo: 'jefe',
+            servicioId: servicioRef.id,
+            createdAt: serverTimestamp(),
+        });
     });
 
-    return docRef.id;
+    return servicioRef.id;
 }
 
 /**
@@ -175,17 +210,40 @@ export async function getServicioJefeOperativoById(id: string): Promise<Servicio
  */
 export async function cerrarServicioJefeOperativo(servicioId: string, cierreData: CierreServicioExtra): Promise<void> {
     const docRef = doc(db, 'servicios_jefe_operativo', servicioId);
-    const expiresAt = new Date(Date.now() + 9 * 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(cierreData.fechaCierre.getTime() + 9 * 24 * 60 * 60 * 1000);
+    const uid = auth.currentUser?.uid ?? '';
 
-    await updateDoc(docRef, {
-        estado: 'cerrado',
-        cierre: {
-            ...cierreData,
-            fechaCierre: Timestamp.fromDate(cierreData.fechaCierre),
-            generatedAt: serverTimestamp(),
-        },
-        updatedAt: serverTimestamp(),
-        expiresAt: Timestamp.fromDate(expiresAt),
+    await runTransaction(db, async (transaction) => {
+        const snapshot = await transaction.get(docRef);
+        if (!snapshot.exists()) {
+            throw new Error('Servicio no encontrado.');
+        }
+
+        const servicio = snapshot.data() as { estado?: string; uidJefe?: string };
+        if (servicio.estado === 'cerrado') {
+            throw new Error('El servicio ya está cerrado.');
+        }
+
+        const lockRef = servicio.uidJefe
+            ? doc(db, 'servicios_activos', `${servicio.uidJefe}_jefe`)
+            : null;
+        const lockSnapshot = lockRef ? await transaction.get(lockRef) : null;
+
+        transaction.update(docRef, {
+            estado: 'cerrado',
+            cierre: {
+                ...cierreData,
+                fechaCierre: Timestamp.fromDate(cierreData.fechaCierre),
+                generatedAt: serverTimestamp(),
+            },
+            updatedAt: serverTimestamp(),
+            updatedBy: uid,
+            expiresAt: Timestamp.fromDate(expiresAt),
+        });
+
+        if (lockRef && lockSnapshot?.exists() && lockSnapshot.data().servicioId === servicioId) {
+            transaction.delete(lockRef);
+        }
     });
 }
 
@@ -205,6 +263,10 @@ export async function registrarIncorporacionJefeOperativo(
             if (!snap.exists()) throw new Error('Servicio no encontrado');
 
             const data = snap.data();
+            if (data.estado !== 'abierto') {
+                throw new Error('El servicio está cerrado y no admite modificaciones.');
+            }
+
             const listaFaltos = data.apertura?.novedadesFormacion?.personalFalto?.lista || [];
 
             const nuevaLista = listaFaltos.map((p: any) => {
@@ -217,6 +279,7 @@ export async function registrarIncorporacionJefeOperativo(
             tx.update(docRef, {
                 'apertura.novedadesFormacion.personalFalto.lista': nuevaLista,
                 updatedAt: serverTimestamp(),
+                updatedBy: auth.currentUser?.uid ?? '',
             });
         });
     });

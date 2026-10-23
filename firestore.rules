@@ -57,7 +57,9 @@ service cloud.firestore {
           'controlInstalaciones',
           'serviciosExtraordinarios',
           'createdAt',
-          'expiresAt'
+          'expiresAt',
+          'updatedAt',
+          'updatedBy'
         ])
         && request.resource.data.uidSupervisor == request.auth.uid
         && request.resource.data.estado == 'abierto'
@@ -65,13 +67,27 @@ service cloud.firestore {
         && request.resource.data.controlInstalaciones is list
         && request.resource.data.serviciosExtraordinarios is list
         && request.resource.data.createdAt is timestamp
-        && request.resource.data.expiresAt is timestamp;
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.updatedBy == request.auth.uid;
     }
 
     function isValidServicioSupervisorUpdate() {
       return request.resource.data.uidSupervisor == resource.data.uidSupervisor
         && request.resource.data.createdAt == resource.data.createdAt
-        && request.resource.data.apertura == resource.data.apertura;
+        && request.resource.data.apertura == resource.data.apertura
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.updatedAt is timestamp
+        && resource.data.estado == 'abierto'
+        && (
+          request.resource.data.estado == 'abierto'
+          || (
+            request.resource.data.estado == 'cerrado'
+            && request.resource.data.cierre is map
+            && request.resource.data.cierre.fechaHora is timestamp
+            && request.resource.data.expiresAt is timestamp
+          )
+        );
     }
 
     function isValidServicioJefeCreate() {
@@ -80,18 +96,36 @@ service cloud.firestore {
           'estado',
           'apertura',
           'createdAt',
-          'updatedAt'
+          'updatedAt',
+          'updatedBy'
         ])
         && request.resource.data.uidJefe == request.auth.uid
         && request.resource.data.estado == 'abierto'
         && request.resource.data.apertura is map
         && request.resource.data.createdAt is timestamp
-        && request.resource.data.updatedAt is timestamp;
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.updatedBy == request.auth.uid;
     }
 
     function isValidServicioJefeUpdate() {
       return request.resource.data.uidJefe == resource.data.uidJefe
-        && request.resource.data.createdAt == resource.data.createdAt;
+        && request.resource.data.createdAt == resource.data.createdAt
+        // La apertura se puede actualizar solo para registrar incorporaciones
+        // tardías; la identidad del plan y su fecha no cambian.
+        && request.resource.data.apertura.nroPlanOperaciones == resource.data.apertura.nroPlanOperaciones
+        && request.resource.data.apertura.fechaApertura == resource.data.apertura.fechaApertura
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.updatedAt is timestamp
+        && resource.data.estado == 'abierto'
+        && (
+          request.resource.data.estado == 'abierto'
+          || (
+            request.resource.data.estado == 'cerrado'
+            && request.resource.data.cierre is map
+            && request.resource.data.cierre.fechaCierre is timestamp
+            && request.resource.data.expiresAt is timestamp
+          )
+        );
     }
 
     match /users/{userId} {
@@ -101,11 +135,20 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /users_archivados/{userId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.archivedBy == request.auth.uid
+        && request.resource.data.archivedAt is timestamp;
+      allow update, delete: if false;
+    }
+
     match /servicios_supervisor/{servicioId} {
       allow read: if isAdmin() || (isSupervisor() && request.auth.uid == resource.data.uidSupervisor);
       allow create: if isSupervisor()
         && isValidServicioSupervisorCreate();
-      allow update: if (isAdmin() || (isSupervisor() && request.auth.uid == resource.data.uidSupervisor))
+      allow update: if isSupervisor()
+        && request.auth.uid == resource.data.uidSupervisor
         && isValidServicioSupervisorUpdate();
       allow delete: if isAdmin();
     }
@@ -114,9 +157,66 @@ service cloud.firestore {
       allow read: if isAdmin() || (isSupervisor() && request.auth.uid == resource.data.uidJefe);
       allow create: if isSupervisor()
         && isValidServicioJefeCreate();
-      allow update: if (isAdmin() || (isSupervisor() && request.auth.uid == resource.data.uidJefe))
+      allow update: if isSupervisor()
+        && request.auth.uid == resource.data.uidJefe
         && isValidServicioJefeUpdate();
       allow delete: if isAdmin();
+    }
+
+    match /servicios_activos/{lockId} {
+      // Un bloqueo por usuario y tipo: {uid}_supervisor o {uid}_jefe.
+      allow read: if isAdmin()
+        || (
+          isSignedIn()
+          && (
+            lockId == request.auth.uid + '_supervisor'
+            || lockId == request.auth.uid + '_jefe'
+            || lockId == request.auth.uid
+          )
+        );
+      allow create: if isSupervisor()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.tipo in ['supervisor', 'jefe']
+        && (
+          (request.resource.data.tipo == 'supervisor' && lockId == request.auth.uid + '_supervisor')
+          || (request.resource.data.tipo == 'jefe' && lockId == request.auth.uid + '_jefe')
+        )
+        && request.resource.data.servicioId is string
+        && request.resource.data.createdAt is timestamp;
+      allow delete: if isAdmin()
+        || (
+          isSupervisor()
+          && (
+            lockId == request.auth.uid + '_supervisor'
+            || lockId == request.auth.uid + '_jefe'
+            || lockId == request.auth.uid
+          )
+        );
+      allow update: if false;
+    }
+
+    match /servicios_supervisor_archivados/{servicioId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.archivedBy == request.auth.uid
+        && request.resource.data.archivedAt is timestamp;
+      allow update, delete: if false;
+    }
+
+    match /servicios_jefe_operativo_archivados/{servicioId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.archivedBy == request.auth.uid
+        && request.resource.data.archivedAt is timestamp;
+      allow update, delete: if false;
+    }
+
+    match /auditoria/{registroId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.creadoEn is timestamp;
+      allow update, delete: if false;
     }
 
     match /{document=**} {

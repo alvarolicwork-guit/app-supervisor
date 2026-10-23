@@ -12,6 +12,7 @@ type HistorialItem = {
   id: string;
   tipo: 'SUPERVISOR' | 'JEFE_OPERATIVO';
   titulo: string;
+  responsable: string;
   estado: 'abierto' | 'cerrado';
   inicio?: Date;
   fin?: Date;
@@ -39,6 +40,7 @@ export default function HistorialPage() {
   const { user, loading: authLoading, isAdmin } = useAuth();
 
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [items, setItems] = useState<HistorialItem[]>([]);
   const [query, setQuery] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState<'TODOS' | 'SUPERVISOR' | 'JEFE_OPERATIVO'>('TODOS');
@@ -66,6 +68,9 @@ export default function HistorialPage() {
           id: s.id || '',
           tipo: 'SUPERVISOR',
           titulo: s.apertura.nroMemorandum || 'Servicio Supervisor',
+          responsable: [s.apertura.supervisorActual?.grado, s.apertura.supervisorActual?.nombreCompleto]
+            .filter(Boolean)
+            .join(' '),
           estado: s.estado,
           inicio: s.apertura.fechaHora,
           fin: s.cierre?.fechaHora,
@@ -76,6 +81,7 @@ export default function HistorialPage() {
           id: s.id || '',
           tipo: 'JEFE_OPERATIVO',
           titulo: s.apertura.nroPlanOperaciones || s.apertura.tipoServicio || 'Servicio Jefe Operativo',
+          responsable: s.apertura.jefeOperativo || s.apertura.supervisorGeneral || '',
           estado: s.estado,
           inicio: s.apertura.fechaApertura,
           fin: s.cierre?.fechaCierre,
@@ -83,6 +89,9 @@ export default function HistorialPage() {
         }));
 
         setItems([...supervisorItems, ...jefeItems].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()));
+      } catch (loadError) {
+        console.error('Error cargando historial:', loadError);
+        setError('No se pudo cargar el historial. Revisa la conexión e intenta de nuevo.');
       } finally {
         setLoading(false);
       }
@@ -108,7 +117,7 @@ export default function HistorialPage() {
       }
 
       if (query.trim()) {
-        const text = `${item.titulo} ${item.id}`.toLowerCase();
+        const text = `${item.titulo} ${item.responsable} ${item.id}`.toLowerCase();
         if (!text.includes(query.toLowerCase())) return false;
       }
 
@@ -136,6 +145,7 @@ export default function HistorialPage() {
     const headers = [
       'tipo',
       'titulo',
+      'responsable',
       'id',
       'inicio',
       'cierre',
@@ -145,6 +155,7 @@ export default function HistorialPage() {
     const rows = filtrados.map((item) => [
       item.tipo,
       item.titulo,
+      item.responsable,
       item.id,
       fmt(item.inicio),
       fmt(item.fin),
@@ -279,7 +290,11 @@ export default function HistorialPage() {
           </div>
         </div>
 
-        {loading || authLoading ? (
+        {error ? (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-6 py-8 text-center">
+            <p className="font-semibold text-red-800">{error}</p>
+          </div>
+        ) : loading || authLoading ? (
           <div className="rounded-xl border border-slate-200 bg-white px-6 py-16 text-center">
             <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-indigo-600" />
             <p className="text-sm text-slate-600">Cargando historial operativo...</p>
@@ -309,6 +324,9 @@ export default function HistorialPage() {
                     <div>
                       <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{isSupervisor ? 'Supervisor 24h' : 'Jefe Operativo'}</p>
                       <p className="mt-1 text-lg font-bold text-slate-900">{item.titulo}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Responsable: {item.responsable || 'Sin registro'}
+                      </p>
                       <p className="mt-1 text-xs text-slate-500">ID: {item.id}</p>
                     </div>
                     <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-bold ${color}`}>

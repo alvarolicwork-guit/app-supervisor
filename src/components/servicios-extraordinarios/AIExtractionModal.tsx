@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { X, Sparkles, FileText, Image as ImageIcon, Loader2, CheckCircle2 } from 'lucide-react';
 import { extractFromText, extractFromPDF, extractFromImage, ExtractionResult } from '@/services/aiExtractionService';
 import { AperturaServicioExtra } from '@/types/servicioExtraordinario';
+import { useAuth } from '@/context/AuthContext';
 
 interface AIExtractionModalProps {
     onExtracted: (data: Partial<AperturaServicioExtra>) => void;
@@ -13,6 +14,7 @@ interface AIExtractionModalProps {
 type TabType = 'whatsapp' | 'pdf' | 'image';
 
 export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalProps) {
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useState<TabType>('whatsapp');
     const [text, setText] = useState('');
     const [file, setFile] = useState<File | null>(null);
@@ -27,22 +29,27 @@ export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalPr
 
         try {
             let result: ExtractionResult;
+            const idToken = await user?.getIdToken();
+
+            if (!idToken) {
+                throw new Error('Sesión no válida. Vuelve a iniciar sesión.');
+            }
 
             if (activeTab === 'whatsapp') {
                 if (!text.trim()) {
                     throw new Error('Por favor pega el mensaje de WhatsApp');
                 }
-                result = await extractFromText(text);
+                result = await extractFromText(idToken, text);
             } else if (activeTab === 'pdf') {
                 if (!file) {
                     throw new Error('Por favor selecciona un archivo PDF');
                 }
-                result = await extractFromPDF(file);
+                result = await extractFromPDF(idToken, file);
             } else {
                 if (!file) {
                     throw new Error('Por favor selecciona una imagen');
                 }
-                result = await extractFromImage(file);
+                result = await extractFromImage(idToken, file);
             }
 
             // Verificar que se extrajo al menos algo
@@ -78,10 +85,28 @@ export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalPr
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0];
-        if (selectedFile) {
-            setFile(selectedFile);
-            setError('');
+        if (!selectedFile) return;
+
+        const maxBytes = 10 * 1024 * 1024;
+        const allowedTypes =
+            activeTab === 'pdf'
+                ? ['application/pdf']
+                : ['image/jpeg', 'image/png', 'image/webp'];
+
+        if (selectedFile.size > maxBytes) {
+            setFile(null);
+            setError('El archivo supera el máximo de 10 MB.');
+            return;
         }
+
+        if (!allowedTypes.includes(selectedFile.type)) {
+            setFile(null);
+            setError('El tipo de archivo no es válido. Usa PDF, JPG, PNG o WebP.');
+            return;
+        }
+
+        setFile(selectedFile);
+        setError('');
     };
 
     return (
@@ -127,11 +152,10 @@ export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalPr
                     </button>
 
                     <button
-                        onClick={() => setActiveTab('image')}
-                        className={`flex-1 min-w-[140px] px-4 sm:px-6 py-3 sm:py-4 font-medium transition-all ${activeTab === 'image'
-                                ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-                                : 'text-gray-600 hover:bg-gray-50'
-                            }`}
+                        type="button"
+                        disabled
+                        title="La extracción desde imágenes estará disponible próximamente"
+                        className="flex-1 min-w-[140px] px-4 sm:px-6 py-3 sm:py-4 font-medium text-gray-400 opacity-50 cursor-not-allowed"
                     >
                         <div className="flex items-center justify-center gap-2">
                             <ImageIcon className="w-5 h-5" />
@@ -170,7 +194,7 @@ export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalPr
                             <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-400 transition-colors">
                                 <input
                                     type="file"
-                                    accept=".pdf"
+                                    accept="application/pdf,.pdf"
                                     onChange={handleFileChange}
                                     className="hidden"
                                     id="pdf-upload"
@@ -203,7 +227,7 @@ export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalPr
                             <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-400 transition-colors">
                                 <input
                                     type="file"
-                                    accept="image/*"
+                                    accept="image/jpeg,image/png,image/webp"
                                     onChange={handleFileChange}
                                     className="hidden"
                                     id="image-upload"

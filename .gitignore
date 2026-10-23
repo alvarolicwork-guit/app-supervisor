@@ -1,4 +1,4 @@
-﻿node_modules
+node_modules
 .next
 out
 .firebase
@@ -7,6 +7,19 @@ firebase-debug.log
 .env.development
 .env.production
 .env.test
+
+# Local artifacts
+*.log
+tsconfig.tsbuildinfo
+.test-build
+temp_dev_output.txt
+.npm-cache
+.audit-build
+.next-audit
+.acl-audit
+
+# Local backups (contain operation data; never commit)
+backups/
 
 # OS junk
 .DS_Store

@@ -72,7 +72,13 @@ export default function ServicioDashboardPage() {
         setShowCierreModal(true);
     };
 
-    const handleConfirmarCierre = async (datos: { entregaServicio: string; casosRutinarios: number; casosRelevantes: number }) => {
+    const handleConfirmarCierre = async (datos: {
+        entregaServicio: string;
+        casosRutinarios: number;
+        casosRelevantes: number;
+        ajusteTotales?: boolean;
+        justificacionAjuste?: string;
+    }) => {
         if (!servicio) return;
 
         try {
@@ -135,6 +141,7 @@ export default function ServicioDashboardPage() {
     }
 
     const servicioActivo = servicio.estado === 'abierto';
+    const puedeEditar = servicioActivo && user?.uid === servicio.uidSupervisor;
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -168,7 +175,7 @@ export default function ServicioDashboardPage() {
                             </div>
                         </div>
 
-                        {servicioActivo && (
+                        {puedeEditar && (
                             <button
                                 onClick={handleCerrarServicioClick}
                                 className="w-full sm:w-auto px-6 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-colors shadow-lg flex items-center justify-center gap-2"
@@ -234,13 +241,17 @@ export default function ServicioDashboardPage() {
                     {notice && <InlineAlert notice={notice} onClose={() => setNotice(null)} />}
 
                     {activeTab === 'instalaciones' && (
-                        <UnidadesControl servicioId={servicio.id!} soloLectura={!servicioActivo} />
+                        <UnidadesControl
+                            servicioId={servicio.id!}
+                            registrosIniciales={servicio.controlInstalaciones}
+                            soloLectura={!puedeEditar}
+                        />
                     )}
 
                     {activeTab === 'sextraordinarios' && (
                         <ServiciosExtraordinariosTab
                             servicio={servicio}
-                            servicioActivo={servicioActivo}
+                            servicioActivo={puedeEditar}
                             onDataChanged={cargarServicio}
                             onNotify={setNotice}
                         />
@@ -250,6 +261,7 @@ export default function ServicioDashboardPage() {
 
             {showCierreModal && (
                 <CierreTurnoModal
+                    registros={servicio.controlInstalaciones}
                     onClose={() => setShowCierreModal(false)}
                     onContinuar={handleConfirmarCierre}
                 />
@@ -408,7 +420,6 @@ function ServiciosExtraordinariosTab({
                 soloLectura={!servicioActivo}
                 onAbrirNuevo={handleAbrirNuevo}
                 onCerrarServicio={handleCerrarServicio}
-                onVerDetalle={(id) => onNotify({ type: 'info', message: `Detalle solicitado para: ${id}` })}
             />
 
             {showAperturaForm && (

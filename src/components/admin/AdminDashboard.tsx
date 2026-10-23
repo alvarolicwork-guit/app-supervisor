@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { LogOut, Users, Shield, FileText, Plus, Loader2, X, Eye, TriangleAlert, Trash2 } from 'lucide-react';
-import { userService, UserProfile } from '@/services/userService';
+import { LogOut, Users, Shield, FileText, Plus, Loader2, X, Eye, TriangleAlert, Trash2, Archive, Pencil, KeyRound, UserCheck, UserX, History } from 'lucide-react';
+import { archivarServicio, type TipoServicioArchivable } from '@/services/archivoService';
+import { userService, UserProfile, UserRole } from '@/services/userService';
 import { cleanupExpiredSupervisorServicios, getAllServiciosAdmin, ServicioSupervisor } from '@/services/servicioSupervisorService';
-import { cleanupExpiredJefeOperativoServicios } from '@/services/jefeOperativoService';
+import { cleanupExpiredJefeOperativoServicios, getAllServiciosJefeOperativoAdmin } from '@/services/jefeOperativoService';
+import type { ServicioJefeOperativo } from '@/types/jefeOperativo';
 import { useRouter } from 'next/navigation';
 import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
 
@@ -58,6 +60,15 @@ export function AdminDashboard() {
                             <p className="text-sm font-semibold">{userProfile?.nombreCompleto}</p>
                             <p className="text-xs text-slate-400">Administrador</p>
                         </div>
+                        <a
+                            href="/historial"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 hover:bg-white/10 rounded-lg transition-colors text-slate-300 hover:text-white"
+                            title="Abrir historial en una nueva ventana"
+                        >
+                            <History className="w-5 h-5" />
+                        </a>
                         <button
                             onClick={() => logout()}
                             className="p-2 hover:bg-white/10 rounded-lg transition-colors text-slate-300 hover:text-white"
@@ -124,9 +135,20 @@ function ResumenTab({ onChangeTab }: { onChangeTab: (tab: 'dashboard' | 'usuario
 }
 
 function UsuariosTab() {
+    const { userProfile } = useAuth();
     const [usuarios, setUsuarios] = useState<UserProfile[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
+    const [notice, setNotice] = useState<InlineAlertData | null>(null);
+    const [actionId, setActionId] = useState<string | null>(null);
+    const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
+    const [editGrado, setEditGrado] = useState('');
+    const [editNombre, setEditNombre] = useState('');
+    const [editCelular, setEditCelular] = useState('');
+    const [savingEdit, setSavingEdit] = useState(false);
+    const [pendingArchiveUser, setPendingArchiveUser] = useState<UserProfile | null>(null);
+    const [motivoUsuario, setMotivoUsuario] = useState('');
+    const [archivandoUsuario, setArchivandoUsuario] = useState<string | null>(null);
 
     useEffect(() => {
         cargarUsuarios();
@@ -135,27 +157,125 @@ function UsuariosTab() {
     const cargarUsuarios = async () => {
         setLoading(true);
         try {
-            const data = await userService.getSupervisores();
+            const data = await userService.getUsuarios();
             setUsuarios(data);
         } catch (e) {
             console.error(e);
+            setNotice({ type: 'error', message: 'No se pudieron cargar los usuarios.' });
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleToggleActive = async (usuario: UserProfile) => {
+        setActionId(usuario.uid);
+        try {
+            await userService.setUserActive(usuario.uid, !usuario.isActive);
+            setNotice({
+                type: 'success',
+                message: `Usuario ${usuario.isActive ? 'desactivado' : 'activado'} correctamente.`,
+            });
+            await cargarUsuarios();
+        } catch (error) {
+            console.error(error);
+            setNotice({
+                type: 'error',
+                message: `No se pudo cambiar el estado: ${error instanceof Error ? error.message : 'error desconocido'}`,
+            });
+        } finally {
+            setActionId(null);
+        }
+    };
+
+    const handleResetPassword = async (usuario: UserProfile) => {
+        setActionId(usuario.uid);
+        try {
+            await userService.sendPasswordReset(usuario.email);
+            setNotice({
+                type: 'success',
+                message: `Se envió un correo de restablecimiento a ${usuario.email}.`,
+            });
+        } catch (error) {
+            console.error(error);
+            setNotice({
+                type: 'error',
+                message: 'No se pudo enviar el correo de restablecimiento.',
+            });
+        } finally {
+            setActionId(null);
+        }
+    };
+
+    const abrirEdicion = (usuario: UserProfile) => {
+        setEditingUser(usuario);
+        setEditGrado(usuario.grado || '');
+        setEditNombre(usuario.nombreCompleto || '');
+        setEditCelular(usuario.celular || '');
+    };
+
+    const guardarEdicion = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingUser) return;
+
+        setSavingEdit(true);
+        try {
+            await userService.updateSupervisorProfile(editingUser.uid, {
+                grado: editGrado.trim(),
+                nombreCompleto: editNombre.trim(),
+                celular: editCelular.trim(),
+            });
+            setNotice({ type: 'success', message: 'Perfil actualizado correctamente.' });
+            setEditingUser(null);
+            await cargarUsuarios();
+        } catch (error) {
+            console.error(error);
+            setNotice({
+                type: 'error',
+                message: `No se pudo actualizar el perfil: ${error instanceof Error ? error.message : 'error desconocido'}`,
+            });
+        } finally {
+            setSavingEdit(false);
+        }
+    };
+
+    const handleArchiveUser = async () => {
+        if (!pendingArchiveUser) return;
+
+        setArchivandoUsuario(pendingArchiveUser.uid);
+        try {
+            await userService.archiveUserProfile(pendingArchiveUser.uid, motivoUsuario);
+            setNotice({
+                type: 'success',
+                message: 'Perfil archivado. La cuenta de Authentication debe eliminarse con el script si corresponde.',
+            });
+            setPendingArchiveUser(null);
+            setMotivoUsuario('');
+            await cargarUsuarios();
+        } catch (error) {
+            console.error(error);
+            setNotice({
+                type: 'error',
+                message: `No se pudo archivar el perfil: ${error instanceof Error ? error.message : 'error desconocido'}`,
+            });
+        } finally {
+            setArchivandoUsuario(null);
         }
     };
 
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-                <h2 className="text-2xl font-bold text-slate-800">Supervisores Registrados</h2>
+                <h2 className="text-2xl font-bold text-slate-800">Usuarios Registrados</h2>
                 <button
                     onClick={() => setShowForm(true)}
                     className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-lg hover:shadow-blue-600/20"
                 >
                     <Plus className="w-5 h-5" />
-                    Nuevo Supervisor
+                    Nuevo Usuario
                 </button>
             </div>
+
+            {notice && <InlineAlert notice={notice} onClose={() => setNotice(null)} />}
 
             {loading ? (
                 <div className="text-center py-12">
@@ -169,14 +289,16 @@ function UsuariosTab() {
                             <tr>
                                 <th className="text-left px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Usuario</th>
                                 <th className="text-left px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Contacto</th>
+                                <th className="text-left px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Rol</th>
                                 <th className="text-left px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
                                 <th className="text-left px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Registro</th>
+                                <th className="sticky right-0 z-10 bg-slate-50 px-4 py-4 text-right text-xs font-bold uppercase tracking-wider text-slate-500 shadow-[-8px_0_8px_-8px_rgba(15,23,42,0.15)]">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {usuarios.length === 0 ? (
                                 <tr>
-                                    <td colSpan={4} className="px-6 py-8 text-center text-slate-500 italic">
+                                    <td colSpan={6} className="px-6 py-8 text-center text-slate-500 italic">
                                         No hay usuarios registrados
                                     </td>
                                 </tr>
@@ -198,12 +320,55 @@ function UsuariosTab() {
                                             {user.celular || 'N/A'}
                                         </td>
                                         <td className="px-6 py-4">
+                                            <span className={`px-2 py-1 rounded-full text-xs font-bold ${user.role === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-sky-100 text-sky-700'}`}>
+                                                {user.role === 'admin' ? 'Administrador' : 'Supervisor'}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4">
                                             <span className={`px-2 py-1 rounded-full text-xs font-bold ${user.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                                 {user.isActive ? 'Activo' : 'Inactivo'}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-sm text-slate-500">
                                             {user.createdAt.toLocaleDateString()}
+                                        </td>
+                                        <td className="sticky right-0 z-10 bg-white px-3 py-4 shadow-[-8px_0_8px_-8px_rgba(15,23,42,0.12)]">
+                                            <div className="flex items-center justify-end gap-1">
+                                                <button
+                                                    onClick={() => abrirEdicion(user)}
+                                                    className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                                                    title="Editar perfil"
+                                                >
+                                                    <Pencil className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => void handleToggleActive(user)}
+                                                    disabled={actionId === user.uid}
+                                                    className={`p-2 rounded-lg disabled:opacity-50 ${user.isActive ? 'text-slate-400 hover:text-red-600 hover:bg-red-50' : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'}`}
+                                                    title={user.isActive ? 'Desactivar usuario' : 'Activar usuario'}
+                                                >
+                                                    {user.isActive ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                                                </button>
+                                                <button
+                                                    onClick={() => void handleResetPassword(user)}
+                                                    disabled={actionId === user.uid}
+                                                    className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg disabled:opacity-50"
+                                                    title="Enviar correo de restablecimiento"
+                                                >
+                                                    <KeyRound className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setMotivoUsuario('');
+                                                        setPendingArchiveUser(user);
+                                                    }}
+                                                    disabled={actionId === user.uid || user.uid === userProfile?.uid}
+                                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-50"
+                                                    title="Archivar perfil"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
@@ -223,6 +388,116 @@ function UsuariosTab() {
                     }}
                 />
             )}
+
+            {pendingArchiveUser && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+                        <div className="bg-red-700 p-5 rounded-t-2xl flex justify-between items-center text-white">
+                            <h2 className="text-lg font-bold">Archivar perfil</h2>
+                            <button onClick={() => setPendingArchiveUser(null)} className="p-2 hover:bg-white/10 rounded-full">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <p className="text-sm text-slate-600">
+                                Se archivará el perfil de{' '}
+                                <strong>{pendingArchiveUser.grado} {pendingArchiveUser.nombreCompleto}</strong>{' '}
+                                y se eliminará de la colección de usuarios. La cuenta de Authentication no se
+                                elimina; para eso usa <code className="text-xs">npm run user:delete</code>.
+                            </p>
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Motivo</label>
+                                <textarea
+                                    value={motivoUsuario}
+                                    onChange={(e) => setMotivoUsuario(e.target.value.slice(0, 300))}
+                                    rows={3}
+                                    maxLength={300}
+                                    placeholder="Ej: retiro, duplicado, corrección..."
+                                    className="w-full px-3 py-2 border rounded-lg text-sm"
+                                />
+                                <p className="text-right text-[10px] text-slate-400">{motivoUsuario.length}/300</p>
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setPendingArchiveUser(null)}
+                                    className="flex-1 py-3 border rounded-xl font-medium text-gray-600 hover:bg-gray-50"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={() => void handleArchiveUser()}
+                                    disabled={motivoUsuario.trim().length < 3 || archivandoUsuario !== null}
+                                    className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 disabled:opacity-50"
+                                >
+                                    {archivandoUsuario ? 'Archivando...' : 'Archivar'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {editingUser && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+                        <div className="bg-slate-900 p-5 rounded-t-2xl flex justify-between items-center text-white">
+                            <h2 className="text-lg font-bold">Editar Usuario</h2>
+                            <button onClick={() => setEditingUser(null)} className="p-2 hover:bg-white/10 rounded-full">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <form onSubmit={guardarEdicion} className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Grado</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={editGrado}
+                                    onChange={(e) => setEditGrado(e.target.value)}
+                                    className="w-full px-3 py-2 border rounded-lg"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Nombre completo</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={editNombre}
+                                    onChange={(e) => setEditNombre(e.target.value)}
+                                    className="w-full px-3 py-2 border rounded-lg"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Celular</label>
+                                <input
+                                    type="tel"
+                                    value={editCelular}
+                                    onChange={(e) => setEditCelular(e.target.value)}
+                                    className="w-full px-3 py-2 border rounded-lg"
+                                    placeholder="Opcional"
+                                />
+                            </div>
+                            <p className="text-xs text-slate-500">Correo: {editingUser.email}</p>
+                            <div className="pt-2 flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setEditingUser(null)}
+                                    className="flex-1 py-3 border rounded-xl font-medium text-gray-600 hover:bg-gray-50"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={savingEdit}
+                                    className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                    {savingEdit ? 'Guardando...' : 'Guardar'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -233,6 +508,7 @@ function RegistroUsuarioModal({ onClose, onSuccess }: { onClose: () => void; onS
     const [grado, setGrado] = useState('');
     const [nombre, setNombre] = useState('');
     const [celular, setCelular] = useState('');
+    const [role, setRole] = useState<UserRole>('supervisor');
     const [loading, setLoading] = useState(false);
     const [notice, setNotice] = useState<InlineAlertData | null>(null);
 
@@ -240,12 +516,20 @@ function RegistroUsuarioModal({ onClose, onSuccess }: { onClose: () => void; onS
         e.preventDefault();
         setLoading(true);
         try {
-            await userService.createSupervisorUser(email, password, {
-                grado,
-                nombreCompleto: nombre,
-                celular
+            await userService.createUser(
+                email,
+                password,
+                {
+                    grado,
+                    nombreCompleto: nombre,
+                    celular,
+                },
+                role
+            );
+            setNotice({
+                type: 'success',
+                message: `Usuario ${role === 'admin' ? 'administrador' : 'supervisor'} creado exitosamente.`,
             });
-            setNotice({ type: 'success', message: 'Usuario creado exitosamente.' });
             onSuccess();
         } catch (error) {
             console.error(error);
@@ -262,7 +546,7 @@ function RegistroUsuarioModal({ onClose, onSuccess }: { onClose: () => void; onS
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
                 <div className="bg-blue-600 p-6 rounded-t-2xl flex justify-between items-center text-white">
-                    <h2 className="text-xl font-bold">Nuevo Supervisor</h2>
+                    <h2 className="text-xl font-bold">Nuevo Usuario</h2>
                     <button onClick={onClose} className="hover:bg-blue-700 p-2 rounded-full"><X className="w-5 h-5" /></button>
                 </div>
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
@@ -283,12 +567,23 @@ function RegistroUsuarioModal({ onClose, onSuccess }: { onClose: () => void; onS
                         <input type="text" required className="w-full px-3 py-2 border rounded-lg" value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Ej: Juan Perez" />
                     </div>
                     <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">Rol</label>
+                        <select
+                            value={role}
+                            onChange={(e) => setRole(e.target.value as UserRole)}
+                            className="w-full px-3 py-2 border rounded-lg bg-white"
+                        >
+                            <option value="supervisor">Supervisor</option>
+                            <option value="admin">Administrador</option>
+                        </select>
+                    </div>
+                    <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">Correo (Usuario)</label>
                         <input type="email" required className="w-full px-3 py-2 border rounded-lg" value={email} onChange={e => setEmail(e.target.value)} placeholder="usuario@policia.bo" />
                     </div>
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">Contraseña Inicial</label>
-                        <input type="text" required className="w-full px-3 py-2 border rounded-lg font-mono text-blue-600 bg-blue-50" value={password} onChange={e => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" />
+                        <input type="password" required minLength={6} className="w-full px-3 py-2 border rounded-lg font-mono text-blue-600 bg-blue-50" value={password} onChange={e => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" />
                     </div>
 
                     <div className="pt-4 flex gap-3">
@@ -306,10 +601,15 @@ function RegistroUsuarioModal({ onClose, onSuccess }: { onClose: () => void; onS
 
 function ServiciosTab({ router }: { router: ReturnType<typeof useRouter> }) {
     const [servicios, setServicios] = useState<ServicioSupervisor[]>([]);
+    const [jefes, setJefes] = useState<ServicioJefeOperativo[]>([]);
     const [loading, setLoading] = useState(true);
-    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [archivandoId, setArchivandoId] = useState<string | null>(null);
     const [notice, setNotice] = useState<InlineAlertData | null>(null);
-    const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+    const [pendingArchive, setPendingArchive] = useState<{
+        tipo: TipoServicioArchivable;
+        id: string;
+    } | null>(null);
+    const [motivoArchivo, setMotivoArchivo] = useState('');
     const [cleaningExpired, setCleaningExpired] = useState(false);
 
     useEffect(() => {
@@ -318,33 +618,42 @@ function ServiciosTab({ router }: { router: ReturnType<typeof useRouter> }) {
 
     const cargarServicios = async () => {
         try {
-            const data = await getAllServiciosAdmin();
+            const [data, jefesData] = await Promise.all([
+                getAllServiciosAdmin(),
+                getAllServiciosJefeOperativoAdmin(),
+            ]);
             setServicios(data);
+            setJefes(jefesData);
         } catch (e) {
             console.error(e);
+            setNotice({ type: 'error', message: 'No se pudieron cargar los servicios.' });
         } finally {
             setLoading(false);
         }
     };
 
-    const handleDelete = async (id: string) => {
-        setDeletingId(id);
+    const handleArchive = async (tipo: TipoServicioArchivable, id: string) => {
+        setArchivandoId(id);
         try {
-            const { deleteServicio } = await import('@/services/servicioSupervisorService');
-            await deleteServicio(id);
+            await archivarServicio(tipo, id, motivoArchivo);
 
-            // Actualizar lista localmente
-            setServicios(prev => prev.filter(s => s.id !== id));
-            setNotice({ type: 'success', message: 'Servicio eliminado correctamente.' });
+            if (tipo === 'supervisor') {
+                setServicios(prev => prev.filter(s => s.id !== id));
+            } else {
+                setJefes(prev => prev.filter(s => s.id !== id));
+            }
+
+            setNotice({ type: 'success', message: 'Servicio archivado correctamente.' });
+            setPendingArchive(null);
+            setMotivoArchivo('');
         } catch (error) {
             console.error(error);
             setNotice({
                 type: 'error',
-                message: `Error al eliminar: ${error instanceof Error ? error.message : 'error desconocido'}`,
+                message: `Error al archivar: ${error instanceof Error ? error.message : 'error desconocido'}`,
             });
         } finally {
-            setDeletingId(null);
-            setPendingDeleteId(null);
+            setArchivandoId(null);
         }
     };
 
@@ -416,21 +725,24 @@ function ServiciosTab({ router }: { router: ReturnType<typeof useRouter> }) {
                                     </div>
 
                                     <div className="flex items-center gap-2">
-                                        {/* Botón Eliminar (Solo para cerrados) */}
+                                        {/* Archivar (Solo para cerrados) */}
                                         {servicio.estado === 'cerrado' && (
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    if (servicio.id) setPendingDeleteId(servicio.id);
+                                                    if (servicio.id) {
+                                                        setMotivoArchivo('');
+                                                        setPendingArchive({ tipo: 'supervisor', id: servicio.id });
+                                                    }
                                                 }}
-                                                disabled={deletingId === servicio.id}
-                                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                title="Eliminar registro permanentemente"
+                                                disabled={archivandoId === servicio.id}
+                                                className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                                                title="Archivar registro"
                                             >
-                                                {deletingId === servicio.id ? (
+                                                {archivandoId === servicio.id ? (
                                                     <Loader2 className="w-4 h-4 animate-spin" />
                                                 ) : (
-                                                    <X className="w-4 h-4" />
+                                                    <Archive className="w-4 h-4" />
                                                 )}
                                             </button>
                                         )}
@@ -450,26 +762,110 @@ function ServiciosTab({ router }: { router: ReturnType<typeof useRouter> }) {
                 </div>
             )}
 
-            {pendingDeleteId && (
+            <div className="mt-10">
+                <h3 className="mb-3 text-lg font-bold text-slate-800">Servicios de Jefe Operativo</h3>
+                {jefes.length === 0 ? (
+                    <p className="rounded-xl border border-dashed border-slate-300 bg-white py-6 text-center text-sm italic text-slate-500">
+                        No hay servicios de Jefe Operativo registrados.
+                    </p>
+                ) : (
+                    <div className="space-y-3">
+                        {jefes.map((jefe) => (
+                            <div key={jefe.id} className="rounded-xl border border-indigo-100 bg-white p-4 shadow-sm">
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                    <div>
+                                        <div className="mb-1 flex items-center gap-2">
+                                            <span className={`rounded px-2 py-0.5 text-xs font-bold uppercase ${jefe.estado === 'abierto' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600'}`}>
+                                                {jefe.estado}
+                                            </span>
+                                            <span className="text-xs text-slate-400">
+                                                {jefe.createdAt.toLocaleString()}
+                                            </span>
+                                        </div>
+                                        <p className="font-bold text-slate-900">
+                                            {jefe.apertura.nroPlanOperaciones || 'Sin plan de operaciones'}
+                                        </p>
+                                        <p className="text-sm text-slate-600">
+                                            {jefe.apertura.tipoServicio || 'Sin tipo de servicio'}
+                                        </p>
+                                        <p className="text-xs text-slate-500">
+                                            Jefe: {jefe.apertura.jefeOperativo || 'Sin registro'}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {jefe.estado === 'cerrado' && jefe.id && (
+                                            <button
+                                                onClick={() => {
+                                                    setMotivoArchivo('');
+                                                    setPendingArchive({ tipo: 'jefe', id: jefe.id as string });
+                                                }}
+                                                disabled={archivandoId === jefe.id}
+                                                className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg"
+                                                title="Archivar registro"
+                                            >
+                                                {archivandoId === jefe.id ? (
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                ) : (
+                                                    <Archive className="w-4 h-4" />
+                                                )}
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => router.push(`/jefe-operativo/${jefe.id}`)}
+                                            className="flex items-center gap-2 rounded-lg bg-indigo-50 px-4 py-2 font-medium text-indigo-700 hover:bg-indigo-100"
+                                        >
+                                            <Eye className="w-4 h-4" />
+                                            Ver
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {pendingArchive && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div className="w-full max-w-md rounded-2xl bg-white p-5 md:p-6 shadow-xl">
-                        <div className="mb-3 flex items-center gap-2 text-red-700">
+                        <div className="mb-3 flex items-center gap-2 text-amber-700">
                             <TriangleAlert className="h-5 w-5" />
-                            <h3 className="font-bold">Eliminar registro permanentemente</h3>
+                            <h3 className="font-bold">Archivar registro</h3>
                         </div>
-                        <p className="mb-6 text-sm text-slate-600">Esta acción no se puede deshacer. El registro se eliminará de forma definitiva.</p>
-                        <div className="flex gap-3">
+                        <p className="mb-4 text-sm text-slate-600">
+                            El registro se moverá al archivo y quedará disponible para auditoría. No se
+                            elimina definitivamente.
+                        </p>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1">
+                            Motivo del archivado
+                        </label>
+                        <textarea
+                            value={motivoArchivo}
+                            onChange={(e) => setMotivoArchivo(e.target.value.slice(0, 300))}
+                            rows={3}
+                            maxLength={300}
+                            placeholder="Ej: cierre de gestión, duplicado, corrección..."
+                            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 outline-none"
+                        />
+                        <p className="mt-1 text-right text-[10px] text-slate-400">
+                            {motivoArchivo.length}/300
+                        </p>
+                        <div className="mt-4 flex gap-3">
                             <button
-                                onClick={() => setPendingDeleteId(null)}
+                                onClick={() => {
+                                    setPendingArchive(null);
+                                    setMotivoArchivo('');
+                                }}
                                 className="flex-1 rounded-xl border border-slate-300 px-4 py-2 font-medium text-slate-700 hover:bg-slate-50"
                             >
                                 Cancelar
                             </button>
                             <button
-                                onClick={() => void handleDelete(pendingDeleteId)}
-                                className="flex-1 rounded-xl bg-red-600 px-4 py-2 font-bold text-white hover:bg-red-700"
+                                onClick={() => void handleArchive(pendingArchive.tipo, pendingArchive.id)}
+                                disabled={motivoArchivo.trim().length < 3 || archivandoId !== null}
+                                className="flex-1 rounded-xl bg-amber-600 px-4 py-2 font-bold text-white hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                Eliminar
+                                Archivar
                             </button>
                         </div>
                     </div>

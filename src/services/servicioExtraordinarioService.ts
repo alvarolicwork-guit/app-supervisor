@@ -1,5 +1,5 @@
-import { db } from '@/lib/firebase';
-import { doc, updateDoc, arrayUnion, Timestamp, runTransaction } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
+import { doc, updateDoc, arrayUnion, Timestamp, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { ServicioExtraordinario, AperturaServicioExtra, CierreServicioExtra } from '@/types/servicioExtraordinario';
 import { withFirestoreRetry } from '@/lib/firestoreRetry';
 
@@ -28,7 +28,9 @@ export async function agregarServicioExtraordinario(
                 ...nuevoServicio.apertura,
                 fechaApertura: Timestamp.fromDate(nuevoServicio.apertura.fechaApertura)
             }
-        })
+        }),
+        updatedAt: serverTimestamp(),
+        updatedBy: auth.currentUser?.uid ?? ''
     });
 
     return nuevoServicio.id;
@@ -52,6 +54,10 @@ export async function cerrarServicioExtraordinario(
             }
 
             const servicio = snap.data();
+            if (servicio.estado !== 'abierto') {
+                throw new Error('El servicio supervisor está cerrado.');
+            }
+
             const serviciosActualizados = (servicio.serviciosExtraordinarios || []).map((s: ServicioExtraordinario) => {
                 if (s.id === servicioExtraId) {
                     return {
@@ -67,7 +73,9 @@ export async function cerrarServicioExtraordinario(
             });
 
             tx.update(docRef, {
-                serviciosExtraordinarios: serviciosActualizados
+                serviciosExtraordinarios: serviciosActualizados,
+                updatedAt: serverTimestamp(),
+                updatedBy: auth.currentUser?.uid ?? ''
             });
         });
     });
