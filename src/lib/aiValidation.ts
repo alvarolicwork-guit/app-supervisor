@@ -17,7 +17,7 @@ export const fileDataSchema = z
         base64: z
             .string()
             .min(1)
-            .max(14_000_000, 'El archivo es demasiado grande (máximo aproximado 10 MB).'),
+            .max(4_500_000, 'El archivo es demasiado grande (máximo aproximado 3 MB).'),
         mimeType: z.enum(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']),
     })
     .optional();

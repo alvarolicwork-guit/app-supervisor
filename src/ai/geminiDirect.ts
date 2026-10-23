@@ -4,8 +4,19 @@ export async function generateContentDirect(prompt: string, fileData?: { base64:
     if (!API_KEY) {
         throw new Error('❌ GOOGLE_AI_API_KEY no está configurada. Crea un archivo .env.local con tu API key.');
     }
-    // Modelos disponibles confirmados en el entorno del usuario (Dec 2025)
-    const MODELS_TO_TRY = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-pro-latest'];
+    // Orden de preferencia. Gemini 2.0 ya no aparece en la lista de modelos
+    // disponibles para esta clave; se mantiene 2.5 Flash como modelo estable.
+    const configuredModel = process.env.GEMINI_MODEL;
+    const MODELS_TO_TRY = Array.from(
+        new Set(
+            [
+                configuredModel,
+                'gemini-2.5-flash',
+                'gemini-2.5-flash-lite',
+                'gemini-pro-latest',
+            ].filter((model): model is string => Boolean(model))
+        )
+    );
 
     for (const model of MODELS_TO_TRY) {
         try {
@@ -24,13 +35,17 @@ export async function generateContentDirect(prompt: string, fileData?: { base64:
             }
 
             const payload = {
-                contents: [{ parts }]
+                contents: [{ parts }],
+                generationConfig: {
+                    temperature: 0.1,
+                },
             };
 
             const response = await fetch(URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
+                signal: AbortSignal.timeout(20_000),
             });
 
             if (!response.ok) {

@@ -7,9 +7,8 @@ import { AIExtractionModal } from './AIExtractionModal';
 import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
 import { normalizarNombre } from '@/utils/text';
 
-type AIExtractionData = Partial<AperturaServicioExtra> & {
+type AIExtractionExtras = {
     casosRelevantes?: CasoRelevante[];
-    casos?: CasoRelevante[];
     observaciones?: string;
 };
 
@@ -111,38 +110,28 @@ export function CierreForm({ personalFaltoInicial, onSave, onCancel }: CierreFor
     };
 
     // --- AI Handler ---
-    const handleAIExtraction = (data: AIExtractionData) => {
-        // La IA devuelve un objeto parcial de Apertura, pero usamos los campos mapeados en el servicio
-        // En este caso, aiExtractionService.ts fue actualizado para devolver 'casosRelevantes' en el raw response,
-        // pero necesitamos acceder a ello.
-        // REVISIÓN: extractFromText devuelve Partial<AperturaServicioExtra>.
-        // Necesitamos que devuelva también los casos.
-        // Como solución rápida, asumiremos que el usuario copia el texto de las novedades y la IA extrae los casos.
-
-        // HACK: As we modified the service but function return type might strict, 
-        // let's assume 'data' might have 'casosRelevantes' if we cast it or if we update the service return type properly.
-        // For now, let's look at what 'data' brings.
-
-        // Si data trae casos (necesitamos asegurar esto en el servicio o modal)
-        // El modal actualmente tipa data como Partial<AperturaServicioExtra>.
-        // Vamos a usar 'any' temporalmente para acceder a propiedades extras si las hubiera, 
-        // o mejor, actualizaremos el modal props.
-
-        if (data.casosRelevantes) {
-            // Map backend field name to frontend expected structure if needed, or if it matches
-            setCasos([...casos, ...data.casosRelevantes]);
-            setTipoNovedades('con');
-        } else if (data.casos) {
-            setCasos([...casos, ...data.casos]);
+    const handleAIExtraction = (
+        _data: Partial<AperturaServicioExtra>,
+        extras?: AIExtractionExtras
+    ) => {
+        const casosExtraidos = extras?.casosRelevantes ?? [];
+        if (casosExtraidos.length > 0) {
+            setCasos((prev) => [...prev, ...casosExtraidos]);
             setTipoNovedades('con');
         }
-        if (data.observaciones) { // Si la IA extrajera observaciones
-            setObservaciones(data.observaciones);
+        if (extras?.observaciones?.trim()) {
+            setObservaciones(extras.observaciones.trim());
             setTieneObservaciones(true);
         }
 
         setShowAIModal(false);
-        setNotice({ type: 'success', message: 'Novedades extraídas. Verifica los datos.' });
+        setNotice({
+            type: 'success',
+            message:
+                casosExtraidos.length > 0
+                    ? `Se agregaron ${casosExtraidos.length} caso(s) relevante(s). Verifica los datos.`
+                    : 'Novedades extraídas. Verifica los datos.',
+        });
     };
 
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -425,6 +414,7 @@ export function CierreForm({ personalFaltoInicial, onSave, onCancel }: CierreFor
             </div>
             {showAIModal && (
                 <AIExtractionModal
+                    mode="cierre"
                     onCancel={() => setShowAIModal(false)}
                     onExtracted={handleAIExtraction}
                 />

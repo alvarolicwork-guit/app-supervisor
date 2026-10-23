@@ -2,18 +2,32 @@
 
 import { useState } from 'react';
 import { X, Sparkles, FileText, Image as ImageIcon, Loader2, CheckCircle2 } from 'lucide-react';
-import { extractFromText, extractFromPDF, extractFromImage, ExtractionResult } from '@/services/aiExtractionService';
-import { AperturaServicioExtra } from '@/types/servicioExtraordinario';
+import {
+    extractFromText,
+    extractFromPDF,
+    extractFromImage,
+    MAX_AI_FILE_BYTES,
+    ExtractionMode,
+    ExtractionResult,
+} from '@/services/aiExtractionService';
+import { AperturaServicioExtra, CasoRelevante } from '@/types/servicioExtraordinario';
 import { useAuth } from '@/context/AuthContext';
 
+interface ExtractionExtras {
+    casosRelevantes?: CasoRelevante[];
+    observaciones?: string;
+}
+
 interface AIExtractionModalProps {
-    onExtracted: (data: Partial<AperturaServicioExtra>) => void;
+    onExtracted: (data: Partial<AperturaServicioExtra>, extras?: ExtractionExtras) => void;
     onCancel: () => void;
+    mode?: ExtractionMode;
 }
 
 type TabType = 'whatsapp' | 'pdf' | 'image';
 
-export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalProps) {
+export function AIExtractionModal({ onExtracted, onCancel, mode = 'apertura' }: AIExtractionModalProps) {
+    const esCierre = mode === 'cierre';
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState<TabType>('whatsapp');
     const [text, setText] = useState('');
@@ -39,12 +53,12 @@ export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalPr
                 if (!text.trim()) {
                     throw new Error('Por favor pega el mensaje de WhatsApp');
                 }
-                result = await extractFromText(idToken, text);
+                result = await extractFromText(idToken, text, mode);
             } else if (activeTab === 'pdf') {
                 if (!file) {
                     throw new Error('Por favor selecciona un archivo PDF');
                 }
-                result = await extractFromPDF(idToken, file);
+                result = await extractFromPDF(idToken, file, mode);
             } else {
                 if (!file) {
                     throw new Error('Por favor selecciona una imagen');
@@ -52,9 +66,20 @@ export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalPr
                 result = await extractFromImage(idToken, file);
             }
 
-            // Verificar que se extrajo al menos algo
-            if (Object.keys(result.data).length === 0 && (!result.dudas || Object.keys(result.dudas).length === 0)) {
-                throw new Error('No se pudo extraer información del documento. Verifica que contenga datos del plan de operaciones.');
+            // Verificar que se extrajo al menos algo (datos, casos u observaciones)
+            const tieneCasos = (result.casosRelevantes?.length ?? 0) > 0;
+            const tieneObservaciones = Boolean(result.observaciones?.trim());
+            if (
+                Object.keys(result.data).length === 0 &&
+                !tieneCasos &&
+                !tieneObservaciones &&
+                (!result.dudas || Object.keys(result.dudas).length === 0)
+            ) {
+                throw new Error(
+                    esCierre
+                        ? 'No se encontraron novedades ni casos relevantes en el documento.'
+                        : 'No se pudo extraer información del documento. Verifica que contenga datos del plan de operaciones.'
+                );
             }
 
             if (result.dudas && Object.keys(result.dudas).length > 0) {
@@ -66,7 +91,10 @@ export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalPr
                 setResolvedDudas(initialResolved);
                 setExtractedResult(result);
             } else {
-                onExtracted(result.data);
+                onExtracted(result.data, {
+                    casosRelevantes: result.casosRelevantes,
+                    observaciones: result.observaciones,
+                });
             }
 
         } catch (err: any) {
@@ -80,14 +108,17 @@ export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalPr
     const handleConfirmDoubts = () => {
         if (!extractedResult) return;
         const finalData = { ...extractedResult.data, ...resolvedDudas };
-        onExtracted(finalData);
+        onExtracted(finalData, {
+            casosRelevantes: extractedResult.casosRelevantes,
+            observaciones: extractedResult.observaciones,
+        });
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0];
         if (!selectedFile) return;
 
-        const maxBytes = 10 * 1024 * 1024;
+        const maxBytes = MAX_AI_FILE_BYTES;
         const allowedTypes =
             activeTab === 'pdf'
                 ? ['application/pdf']
@@ -95,7 +126,7 @@ export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalPr
 
         if (selectedFile.size > maxBytes) {
             setFile(null);
-            setError('El archivo supera el máximo de 10 MB.');
+            setError('El archivo supera el máximo de 3 MB permitido en la versión web.');
             return;
         }
 
@@ -116,7 +147,9 @@ export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalPr
                 <div className="app-modal-header gap-3 px-5 py-4 sm:px-6">
                     <div className="flex items-center gap-3">
                         <Sparkles className="h-5 w-5 text-white" />
-                        <h2 className="text-base font-bold sm:text-lg">Auto-completar con IA</h2>
+                        <h2 className="text-base font-bold sm:text-lg">
+                            {esCierre ? 'Auto-completar novedades' : 'Auto-completar apertura'}
+                        </h2>
                     </div>
                     <button onClick={onCancel} className="rounded-lg p-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white" aria-label="Cerrar">
                         <X className="h-5 w-5" />
@@ -169,8 +202,10 @@ export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalPr
                     {/* WhatsApp Tab */}
                     {!extractedResult && activeTab === 'whatsapp' && (
                         <div className="space-y-3">
-                            <p className="text-sm text-gray-600">
-                                Pega aquí el mensaje de WhatsApp que contiene el plan de operaciones:
+                            <p className="text-sm text-slate-600">
+                                {esCierre
+                                    ? 'Pega aquí el mensaje de WhatsApp con las novedades del servicio:'
+                                    : 'Pega aquí el mensaje de WhatsApp que contiene el plan de operaciones:'}
                             </p>
                             <textarea
                                 value={text}
@@ -178,8 +213,12 @@ export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalPr
                                     setText(e.target.value);
                                     setError('');
                                 }}
-                                placeholder="PLAN DE OPERACIONES Nº 1576/2025&#10;&#10;Personal Contemplado: 22&#10;Supervisor General: Tcnl. DEAP Alberto Suarez..."
-                                className="w-full h-48 sm:h-64 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                                placeholder={
+                                    esCierre
+                                        ? 'NOVEDADES DEL SERVICIO...\\n\\nA las 14:30, en la calle...\\nSe registró una riña entre...'
+                                        : 'PLAN DE OPERACIONES Nº 1576/2025\\n\\nPersonal Contemplado: 22\\nSupervisor General: Tcnl. DEAP Alberto Suarez...'
+                                }
+                                className="app-input h-48 resize-none font-mono text-sm sm:h-64"
                                 disabled={loading}
                             />
                         </div>
@@ -188,9 +227,12 @@ export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalPr
                     {/* PDF Tab */}
                     {!extractedResult && activeTab === 'pdf' && (
                         <div className="space-y-3">
-                            <p className="text-sm text-gray-600">
-                                Sube el PDF del plan de operaciones:
+                            <p className="text-sm text-slate-600">
+                                {esCierre
+                                    ? 'Sube el PDF con las novedades del servicio:'
+                                    : 'Sube el PDF del plan de operaciones:'}
                             </p>
+                            <p className="text-xs text-slate-400">Máximo 3 MB en la versión web.</p>
                             <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-400 transition-colors">
                                 <input
                                     type="file"
@@ -221,8 +263,10 @@ export function AIExtractionModal({ onExtracted, onCancel }: AIExtractionModalPr
                     {/* Image Tab */}
                     {!extractedResult && activeTab === 'image' && (
                         <div className="space-y-3">
-                            <p className="text-sm text-gray-600">
-                                Sube una foto del plan de operaciones:
+                            <p className="text-sm text-slate-600">
+                                {esCierre
+                                    ? 'Sube una foto con las novedades del servicio:'
+                                    : 'Sube una foto del plan de operaciones:'}
                             </p>
                             <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-400 transition-colors">
                                 <input
