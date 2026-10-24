@@ -22,6 +22,7 @@
     "src/utils/reporteSupervisor.ts",
     "src/utils/text.ts",
     "src/utils/resumen.ts",
+    "src/utils/password.ts",
     "tests/**/*.test.ts"
   ]
 }

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Inter, Source_Code_Pro } from "next/font/google";
 import { AuthProvider } from "@/context/AuthContext";
+import { AuthGate } from "@/components/auth/AuthGate";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const sourceCodePro = Source_Code_Pro({
@@ -30,7 +31,9 @@ export default function RootLayout({
               LOCAL DEV
             </div>
           )}
-          <main>{children}</main>
+          <main>
+            <AuthGate>{children}</AuthGate>
+          </main>
         </AuthProvider>
       </body>
     </html>

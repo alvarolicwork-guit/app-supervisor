@@ -61,6 +61,7 @@ await testEnv.withSecurityRulesDisabled(async (context) => {
     role: 'supervisor',
     isActive: true,
     createdAt: nowTs,
+    mustChangePassword: true,
   });
 
   await setDoc(doc(db, 'users', otherSupervisorUid), {
@@ -69,6 +70,7 @@ await testEnv.withSecurityRulesDisabled(async (context) => {
     role: 'supervisor',
     isActive: true,
     createdAt: nowTs,
+    mustChangePassword: true,
   });
 
   await setDoc(doc(db, 'servicios_supervisor', 'svc_own'), {
@@ -143,6 +145,25 @@ await check('Admin can read any user profile', async () => {
 
 await check('Unauthenticated user cannot read user profile', async () => {
   await assertFails(getDoc(doc(unauthDb, 'users', supervisorUid)));
+});
+
+await check('User can clear only their own mustChangePassword flag', async () => {
+  await assertSucceeds(
+    updateDoc(doc(supervisorDb, 'users', supervisorUid), {
+      mustChangePassword: false,
+      updatedAt: nowTs,
+    })
+  );
+});
+
+await check('User cannot use password change to alter their role', async () => {
+  await assertFails(
+    updateDoc(doc(otherSupervisorDb, 'users', otherSupervisorUid), {
+      mustChangePassword: false,
+      role: 'admin',
+      updatedAt: nowTs,
+    })
+  );
 });
 
 await check('Supervisor can read own servicio_supervisor', async () => {

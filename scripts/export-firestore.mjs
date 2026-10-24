@@ -7,6 +7,7 @@ const COLLECTIONS = [
     'users_archivados',
     'servicios_supervisor',
     'servicios_jefe_operativo',
+    'registros_unidades',
     'servicios_activos',
     'servicios_supervisor_archivados',
     'servicios_jefe_operativo_archivados',

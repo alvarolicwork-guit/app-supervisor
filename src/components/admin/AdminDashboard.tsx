@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { LogOut, Users, Shield, FileText, Plus, Loader2, X, Eye, TriangleAlert, Trash2, Archive, Pencil, KeyRound, UserCheck, UserX, History } from 'lucide-react';
+import { LogOut, Users, Shield, FileText, Plus, Loader2, X, Eye, TriangleAlert, Trash2, Archive, Pencil, KeyRound, UserCheck, UserX, History, RefreshCw, Copy, Check } from 'lucide-react';
 import { archivarServicio, type TipoServicioArchivable } from '@/services/archivoService';
 import { userService, UserProfile, UserRole } from '@/services/userService';
 import { cleanupExpiredSupervisorServicios, getAllServiciosAdmin, ServicioSupervisor } from '@/services/servicioSupervisorService';
@@ -10,6 +10,7 @@ import { cleanupExpiredJefeOperativoServicios, getAllServiciosJefeOperativoAdmin
 import type { ServicioJefeOperativo } from '@/types/jefeOperativo';
 import { useRouter } from 'next/navigation';
 import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
+import { generarPasswordSegura, validarPasswordSegura } from '@/utils/password';
 
 export function AdminDashboard() {
     const { logout, userProfile } = useAuth();
@@ -383,7 +384,6 @@ function UsuariosTab() {
                 <RegistroUsuarioModal
                     onClose={() => setShowForm(false)}
                     onSuccess={() => {
-                        setShowForm(false);
                         cargarUsuarios();
                     }}
                 />
@@ -504,16 +504,24 @@ function UsuariosTab() {
 
 function RegistroUsuarioModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
     const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+    const [password, setPassword] = useState(() => generarPasswordSegura());
     const [grado, setGrado] = useState('');
     const [nombre, setNombre] = useState('');
     const [celular, setCelular] = useState('');
     const [role, setRole] = useState<UserRole>('supervisor');
     const [loading, setLoading] = useState(false);
     const [notice, setNotice] = useState<InlineAlertData | null>(null);
+    const [createdCredentials, setCreatedCredentials] = useState<{ email: string; password: string } | null>(null);
+    const [copiado, setCopiado] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        const erroresPassword = validarPasswordSegura(password);
+        if (erroresPassword.length > 0) {
+            setNotice({ type: 'error', message: `Contraseña inicial: ${erroresPassword[0]}` });
+            return;
+        }
+
         setLoading(true);
         try {
             await userService.createUser(
@@ -526,10 +534,8 @@ function RegistroUsuarioModal({ onClose, onSuccess }: { onClose: () => void; onS
                 },
                 role
             );
-            setNotice({
-                type: 'success',
-                message: `Usuario ${role === 'admin' ? 'administrador' : 'supervisor'} creado exitosamente.`,
-            });
+            setCreatedCredentials({ email, password });
+            setNotice(null);
             onSuccess();
         } catch (error) {
             console.error(error);
@@ -541,6 +547,57 @@ function RegistroUsuarioModal({ onClose, onSuccess }: { onClose: () => void; onS
             setLoading(false);
         }
     };
+
+    const copiarCredenciales = async () => {
+        if (!createdCredentials) return;
+        await navigator.clipboard.writeText(
+            `Correo: ${createdCredentials.email}\nContraseña inicial: ${createdCredentials.password}`
+        );
+        setCopiado(true);
+        window.setTimeout(() => setCopiado(false), 2000);
+    };
+
+    if (createdCredentials) {
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+                <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+                    <div className="flex items-center justify-between bg-emerald-700 p-6 text-white">
+                        <h2 className="text-xl font-bold">Usuario creado</h2>
+                        <button onClick={onClose} className="rounded-full p-2 hover:bg-white/10" aria-label="Cerrar">
+                            <X className="h-5 w-5" />
+                        </button>
+                    </div>
+                    <div className="space-y-4 p-6">
+                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+                            Comparte estas credenciales con el usuario. La contraseña deberá cambiarse en el primer ingreso.
+                        </div>
+                        <div>
+                            <p className="app-label">Correo</p>
+                            <p className="mt-1 font-mono text-sm text-slate-800">{createdCredentials.email}</p>
+                        </div>
+                        <div>
+                            <p className="app-label">Contraseña inicial</p>
+                            <div className="mt-1 flex items-center gap-2 rounded-xl border border-slate-300 bg-slate-50 p-3">
+                                <code className="min-w-0 flex-1 break-all text-sm font-bold text-slate-900">
+                                    {createdCredentials.password}
+                                </code>
+                                <button type="button" onClick={() => void copiarCredenciales()} className="app-btn-secondary shrink-0 px-3 py-2 text-xs">
+                                    {copiado ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                    {copiado ? 'Copiado' : 'Copiar'}
+                                </button>
+                            </div>
+                        </div>
+                        <p className="text-xs text-slate-500">
+                            Esta contraseña no se volverá a mostrar después de cerrar esta ventana.
+                        </p>
+                        <button type="button" onClick={onClose} className="app-btn-primary w-full">
+                            Cerrar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
@@ -582,8 +639,31 @@ function RegistroUsuarioModal({ onClose, onSuccess }: { onClose: () => void; onS
                         <input type="email" required className="w-full px-3 py-2 border rounded-lg" value={email} onChange={e => setEmail(e.target.value)} placeholder="usuario@policia.bo" />
                     </div>
                     <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1">Contraseña Inicial</label>
-                        <input type="password" required minLength={6} className="w-full px-3 py-2 border rounded-lg font-mono text-blue-600 bg-blue-50" value={password} onChange={e => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" />
+                        <label className="block text-sm font-bold text-gray-700 mb-1">Contraseña inicial</label>
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                required
+                                minLength={12}
+                                autoComplete="off"
+                                spellCheck={false}
+                                className="app-input flex-1 font-mono text-indigo-700"
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
+                                placeholder="Contraseña segura"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setPassword(generarPasswordSegura())}
+                                className="app-btn-secondary px-3"
+                                title="Generar otra contraseña segura"
+                            >
+                                <RefreshCw className="h-4 w-4" />
+                            </button>
+                        </div>
+                        <p className="mt-1 text-[11px] text-slate-500">
+                            Mínimo 12 caracteres, con mayúscula, minúscula, número y símbolo. El usuario deberá cambiarla al ingresar.
+                        </p>
                     </div>
 
                     <div className="pt-4 flex gap-3">

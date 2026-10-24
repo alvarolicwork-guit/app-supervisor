@@ -32,6 +32,7 @@ export interface UserProfile {
     celular?: string;
     createdAt: Date;
     isActive: boolean;
+    mustChangePassword?: boolean;
 }
 
 export const userService = {
@@ -62,12 +63,20 @@ export const userService = {
             uid,
             createdAt: new Date(),
             isActive: true,
+            mustChangePassword: data.mustChangePassword ?? true,
         };
         if (data.grado !== undefined) payload.grado = normalizarNombre(data.grado);
         if (data.nombreCompleto !== undefined) {
             payload.nombreCompleto = normalizarNombre(data.nombreCompleto);
         }
         await setDoc(docRef, payload, { merge: true });
+    },
+
+    async completePasswordChange(uid: string): Promise<void> {
+        await updateDoc(doc(db, 'users', uid), {
+            mustChangePassword: false,
+            updatedAt: serverTimestamp(),
+        });
     },
 
     /**

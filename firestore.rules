@@ -49,6 +49,18 @@ service cloud.firestore {
         && request.resource.data.isActive is bool;
     }
 
+    function isSelfPasswordChange(userId) {
+      return isSignedIn()
+        && request.auth.uid == userId
+        && resource.data.mustChangePassword == true
+        && request.resource.data.mustChangePassword == false
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'mustChangePassword',
+          'updatedAt'
+        ])
+        && request.resource.data.updatedAt is timestamp;
+    }
+
     function isValidServicioSupervisorCreate() {
       return request.resource.data.keys().hasAll([
           'uidSupervisor',
@@ -131,7 +143,8 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
       allow create: if isAdmin() && isValidUserCreate(userId);
-      allow update: if isAdmin() && isValidUserUpdate(userId);
+      allow update: if (isAdmin() && isValidUserUpdate(userId))
+        || isSelfPasswordChange(userId);
       allow delete: if isAdmin();
     }
 
