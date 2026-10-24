@@ -10,6 +10,7 @@ import { CierreServicioExtra, PersonalNovedad } from '@/types/servicioExtraordin
 import { useAuth } from '@/context/AuthContext';
 import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
 import { transformarTareasPasadoAction, generarInformeInstitucionalIAAction } from '@/app/actions';
+import { lineasCasosRutina, totalCasosRutina } from '@/utils/casosRutina';
 
 function formatFechaSolo(date: Date) {
     return new Intl.DateTimeFormat('es-BO', {
@@ -115,6 +116,12 @@ function buildReporteCierreWhatsapp(servicio: ServicioJefeOperativo, cierre: Cie
             .join('\n')
         : 'SIN NOVEDAD';
 
+    const rutina = lineasCasosRutina(cierre.casosRutina);
+    const totalRutina = totalCasosRutina(cierre.casosRutina);
+    const rutinaTexto = rutina.length > 0
+        ? `*CASOS ATENDIDOS DE RUTINA*\n${rutina.map((linea) => `• ${linea}`).join('\n')}\n*TOTAL CASOS DE RUTINA:* ${totalRutina}\n\n`
+        : '';
+
     const tareasPasado = cierre.tareasEjecutadas || toPastTenseFallback(servicio.apertura.tareas || '');
 
     return `*REPORTE OPERATIVO*
@@ -149,6 +156,7 @@ function buildReporteCierreWhatsapp(servicio: ServicioJefeOperativo, cierre: Cie
 ${tareasPasado}
 
 *NOVEDADES DEL SERVICIO*
+${rutinaTexto}*CASOS RELEVANTES:*
 ${novedadesServicioTexto}
 
 *NOVEDADES DEL  PERSONAL:*
@@ -174,6 +182,12 @@ function buildInformeInstitucionalDraft(servicio: ServicioJefeOperativo, cierre:
     const casosTexto = casos.length > 0
         ? casos.map((c, i) => `${i + 1}. ${c.tipo} - ${c.lugar} (${c.hora}). ${c.detalle}`).join('\n')
         : 'SIN NOVEDAD';
+
+    const rutina = lineasCasosRutina(cierre.casosRutina);
+    const totalRutina = totalCasosRutina(cierre.casosRutina);
+    const rutinaTexto = rutina.length > 0
+        ? `Casos atendidos de rutina:\n${rutina.map((linea) => `- ${linea}`).join('\n')}\n- Total de casos de rutina: ${totalRutina}\n\n`
+        : '';
 
     const tardios = (cierre.personalIncorporadoTarde || [])
         .map((p) => `- ${p.gradoNombre} (Incorporación: ${p.horaIncorporacion || 'S/H'})`)
@@ -218,6 +232,7 @@ OPERACIÓN: ${servicio.apertura.tipoServicio || 'SIN TÍTULO'}
 ${tareasPasado}
 
 5. NOVEDADES DEL SERVICIO
+${rutinaTexto}Casos relevantes:
 ${casosTexto}
 
 6. NOVEDADES DEL PERSONAL

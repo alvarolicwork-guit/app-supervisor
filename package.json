@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit --incremental false",
-    "test": "tsc -p tsconfig.test.json && node .test-build/tests/normalizers.test.js && node .test-build/tests/reporteSupervisor.test.js && node .test-build/tests/text.test.js && node .test-build/tests/resumen.test.js && node .test-build/tests/password.test.js",
+    "test": "tsc -p tsconfig.test.json && node .test-build/tests/normalizers.test.js && node .test-build/tests/reporteSupervisor.test.js && node .test-build/tests/text.test.js && node .test-build/tests/resumen.test.js && node .test-build/tests/password.test.js && node .test-build/tests/casosRutina.test.js",
     "test:rules": "firebase emulators:exec --only firestore --project registro-de-supervisor \"node verify-firestore-rules.mjs\"",
     "create-admin": "node scripts/create-admin.mjs",
     "user:set-active": "node scripts/set-user-active.mjs",

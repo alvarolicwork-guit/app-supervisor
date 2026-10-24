@@ -1,4 +1,5 @@
 import type { ServicioSupervisor } from '@/services/servicioSupervisorService';
+import { lineasCasosRutina, totalCasosRutina } from './casosRutina';
 
 export function generarInformeTexto(
     servicio: ServicioSupervisor,
@@ -88,6 +89,13 @@ export function generarInformeTexto(
             const novedadesCierre = s.cierre?.novedades;
             const casosCierre = Array.isArray(novedadesCierre?.casos) ? novedadesCierre.casos : [];
             const partesNovedades: string[] = [];
+
+            const rutina = lineasCasosRutina(s.cierre?.casosRutina);
+            if (rutina.length > 0) {
+                partesNovedades.push(
+                    `Casos atendidos de rutina: ${rutina.join('; ')}. Total: ${totalCasosRutina(s.cierre?.casosRutina)}`
+                );
+            }
 
             if (casosCierre.length > 0) {
                 partesNovedades.push(

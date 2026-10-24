@@ -23,6 +23,7 @@
     "src/utils/text.ts",
     "src/utils/resumen.ts",
     "src/utils/password.ts",
+    "src/utils/casosRutina.ts",
     "tests/**/*.test.ts"
   ]
 }

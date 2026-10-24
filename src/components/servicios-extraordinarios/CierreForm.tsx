@@ -6,6 +6,13 @@ import { PersonalNovedad, CierreServicioExtra, CasoRelevante, AperturaServicioEx
 import { AIExtractionModal } from './AIExtractionModal';
 import { InlineAlert, type InlineAlertData } from '@/components/ui/InlineAlert';
 import { normalizarNombre } from '@/utils/text';
+import { NumberStepper } from '@/components/ui/NumberStepper';
+import {
+    CAMPOS_CASOS_RUTINA,
+    CASOS_RUTINA_DEFECTO,
+    type CasosRutina,
+    totalCasosRutina,
+} from '@/utils/casosRutina';
 
 type AIExtractionExtras = {
     casosRelevantes?: CasoRelevante[];
@@ -32,6 +39,7 @@ export function CierreForm({ personalFaltoInicial, onSave, onCancel }: CierreFor
     // Novedades y Casos
     const [tipoNovedades, setTipoNovedades] = useState<'sin' | 'con'>('sin');
     const [casos, setCasos] = useState<CasoRelevante[]>([]);
+    const [casosRutina, setCasosRutina] = useState<CasosRutina>({ ...CASOS_RUTINA_DEFECTO });
 
     // Observaciones Generales
     const [tieneObservaciones, setTieneObservaciones] = useState(false);
@@ -146,6 +154,7 @@ export function CierreForm({ personalFaltoInicial, onSave, onCancel }: CierreFor
             fechaCierre: new Date(),
             personalFaltoServicio: personalFalto,
             personalIncorporadoTarde,
+            casosRutina: tipoNovedades === 'con' ? casosRutina : undefined,
             novedades: {
                 tipo: tipoNovedades,
                 ...(tipoNovedades === 'con' && { casos }),
@@ -314,6 +323,36 @@ export function CierreForm({ personalFaltoInicial, onSave, onCancel }: CierreFor
 
                         {tipoNovedades === 'con' && (
                             <div className="space-y-4 mt-4 animate-in slide-in-from-top-2 fade-in">
+                                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                    <div className="mb-4 flex items-center justify-between gap-3">
+                                        <div>
+                                            <h4 className="font-bold text-slate-900">Casos atendidos de rutina</h4>
+                                            <p className="mt-1 text-xs text-slate-500">
+                                                Registra solo la cantidad por categoría. Los casos relevantes se detallan abajo.
+                                            </p>
+                                        </div>
+                                        <span className="rounded-lg bg-white px-3 py-1 text-xs font-bold text-slate-700 shadow-sm">
+                                            Total: {totalCasosRutina(casosRutina)}
+                                        </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                        {CAMPOS_CASOS_RUTINA.map((campo) => (
+                                            <NumberStepper
+                                                key={campo.key}
+                                                label={campo.label}
+                                                value={casosRutina[campo.key]}
+                                                onChange={(valor) =>
+                                                    setCasosRutina((prev) => ({
+                                                        ...prev,
+                                                        [campo.key]: valor,
+                                                    }))
+                                                }
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+
                                 <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
                                     <h4 className="font-bold text-blue-900 mb-3 text-sm">Registro de Casos Relevantes</h4>
 

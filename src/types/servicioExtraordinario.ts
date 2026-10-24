@@ -1,5 +1,5 @@
 // Tipos para Servicios Extraordinarios
-
+import type { CasosRutina } from '@/utils/casosRutina';
 
 export interface PersonalNovedad {
     gradoNombre: string;
@@ -60,6 +60,7 @@ export interface CierreServicioExtra {
     personalFaltoServicio: PersonalNovedad[];  // Heredado de apertura
     personalIncorporadoTarde?: PersonalNovedad[];
     tareasEjecutadas?: string;
+    casosRutina?: CasosRutina;
     reporteWhatsappFinal?: string;
     informeInstitucionalFinal?: string;
     generatedAt?: Date;
