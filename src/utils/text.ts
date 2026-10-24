@@ -6,7 +6,7 @@ const GRADOS = new Set([
 ]);
 
 const ACRONIMOS = new Set([
-    'DEAP', 'FELCC', 'FELCV', 'FELCN', 'DIPROVE', 'INTERPOL', 'POFOMA',
+    'DEAP', 'FELCC', 'FELCV', 'FELCN', 'DIPROVE', 'INTERPOL', 'POFOMA', 'FELCDA',
     'UTOP', 'PAC', 'UTEPII', 'BSFE', 'EPI', 'MOP', 'GACIP', 'GIT', 'SIT',
     'UCO', 'DACI', 'DIPROVE', 'SEIC', 'SCIP', 'CIPC', 'DELTA', 'PRC',
 ]);

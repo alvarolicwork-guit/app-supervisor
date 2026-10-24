@@ -33,7 +33,7 @@ const UNIDADES_FIJAS: Unidad[] = [
     },
     { id: 'DIPROVE', nombre: 'DIPROVE' },
     { id: 'INTERPOL', nombre: 'INTERPOL' },
-    { id: 'POFOMA', nombre: 'POFOMA' },
+    { id: 'FELCDA', nombre: 'FELCDA' },
     {
         id: 'TRANSITO',
         nombre: 'TRANSITO',

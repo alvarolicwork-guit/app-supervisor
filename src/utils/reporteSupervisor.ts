@@ -21,7 +21,7 @@ export function generarInformeTexto(
     // --- SECCIÓN I: UNIDADES SUPERVISADAS ---
     // Objetivo: Listar unidades. Si hay novedades, detallarlas.
     // Estructura pedida:
-    // [Unidades supervisadas durante el servicio Ejemplo: 1. FELCC CENTRAL 2. POFOMA 3. RECINTO PENITENCIARIO DE SAN ROQUE.]
+    // [Unidades supervisadas durante el servicio Ejemplo: 1. FELCC CENTRAL 2. FELCDA 3. RECINTO PENITENCIARIO DE SAN ROQUE.]
     // [Referir si se encuentran con novedad o sin novedad del “personal” ejemplo: 1. Faltaron al servicio - Sgto. David Mamani...]
     // [Referir “ con novedad” o “sin Novedad” de “casos de relevancia”...]
 
@@ -216,7 +216,7 @@ Sucre, ${formatDate(new Date())}
 `;
 }
 
-// Helper para listar unidades "1. FELCC 2. POFOMA..."
+// Helper para listar unidades "1. FELCC 2. FELCDA..."
 function unitsToList(unidades: any[]): string {
     if (unidades.length === 0) return 'Ninguna unidad registrada';
     return unidades.map((u, i) => `${i + 1}. ${u.unidad}`).join('  ');
