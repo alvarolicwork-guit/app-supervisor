@@ -512,7 +512,7 @@ function RegistroUsuarioModal({ onClose, onSuccess }: { onClose: () => void; onS
     const [loading, setLoading] = useState(false);
     const [notice, setNotice] = useState<InlineAlertData | null>(null);
     const [createdCredentials, setCreatedCredentials] = useState<{ email: string; password: string } | null>(null);
-    const [copiado, setCopiado] = useState(false);
+    const [copiado, setCopiado] = useState<'email' | 'password' | null>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -522,10 +522,11 @@ function RegistroUsuarioModal({ onClose, onSuccess }: { onClose: () => void; onS
             return;
         }
 
+        const emailLimpio = email.trim();
         setLoading(true);
         try {
             await userService.createUser(
-                email,
+                emailLimpio,
                 password,
                 {
                     grado,
@@ -534,7 +535,7 @@ function RegistroUsuarioModal({ onClose, onSuccess }: { onClose: () => void; onS
                 },
                 role
             );
-            setCreatedCredentials({ email, password });
+            setCreatedCredentials({ email: emailLimpio, password });
             setNotice(null);
             onSuccess();
         } catch (error) {
@@ -548,13 +549,10 @@ function RegistroUsuarioModal({ onClose, onSuccess }: { onClose: () => void; onS
         }
     };
 
-    const copiarCredenciales = async () => {
-        if (!createdCredentials) return;
-        await navigator.clipboard.writeText(
-            `Correo: ${createdCredentials.email}\nContraseña inicial: ${createdCredentials.password}`
-        );
-        setCopiado(true);
-        window.setTimeout(() => setCopiado(false), 2000);
+    const copiarCampo = async (valor: string, campo: 'email' | 'password') => {
+        await navigator.clipboard.writeText(valor);
+        setCopiado(campo);
+        window.setTimeout(() => setCopiado(null), 2000);
     };
 
     if (createdCredentials) {
@@ -573,7 +571,15 @@ function RegistroUsuarioModal({ onClose, onSuccess }: { onClose: () => void; onS
                         </div>
                         <div>
                             <p className="app-label">Correo</p>
-                            <p className="mt-1 font-mono text-sm text-slate-800">{createdCredentials.email}</p>
+                            <div className="mt-1 flex items-center gap-2 rounded-xl border border-slate-300 bg-slate-50 p-3">
+                                <code className="min-w-0 flex-1 break-all text-sm text-slate-800">
+                                    {createdCredentials.email}
+                                </code>
+                                <button type="button" onClick={() => void copiarCampo(createdCredentials.email, 'email')} className="app-btn-secondary shrink-0 px-3 py-2 text-xs">
+                                    {copiado === 'email' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                    {copiado === 'email' ? 'Copiado' : 'Copiar'}
+                                </button>
+                            </div>
                         </div>
                         <div>
                             <p className="app-label">Contraseña inicial</p>
@@ -581,14 +587,15 @@ function RegistroUsuarioModal({ onClose, onSuccess }: { onClose: () => void; onS
                                 <code className="min-w-0 flex-1 break-all text-sm font-bold text-slate-900">
                                     {createdCredentials.password}
                                 </code>
-                                <button type="button" onClick={() => void copiarCredenciales()} className="app-btn-secondary shrink-0 px-3 py-2 text-xs">
-                                    {copiado ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                                    {copiado ? 'Copiado' : 'Copiar'}
+                                <button type="button" onClick={() => void copiarCampo(createdCredentials.password, 'password')} className="app-btn-secondary shrink-0 px-3 py-2 text-xs">
+                                    {copiado === 'password' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                    {copiado === 'password' ? 'Copiado' : 'Copiar contraseña'}
                                 </button>
                             </div>
                         </div>
                         <p className="text-xs text-slate-500">
-                            Esta contraseña no se volverá a mostrar después de cerrar esta ventana.
+                            Usa “Copiar contraseña” para pegar solo la contraseña, sin las etiquetas.
+                            No se volverá a mostrar después de cerrar esta ventana.
                         </p>
                         <button type="button" onClick={onClose} className="app-btn-primary w-full">
                             Cerrar

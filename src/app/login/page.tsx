@@ -1,30 +1,34 @@
 'use client';
 
 import { useState } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
-import { Shield, Key, Mail, Loader2, AlertTriangle } from 'lucide-react';
+import { Shield, Key, Mail, Loader2, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [resetLoading, setResetLoading] = useState(false);
     const [error, setError] = useState('');
+    const [info, setInfo] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const router = useRouter();
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError('');
+        setInfo('');
 
         try {
-            await signInWithEmailAndPassword(auth, email, password);
+            await signInWithEmailAndPassword(auth, email.trim(), password);
             router.push('/');
         } catch (err: any) {
             console.error(err);
             if (err.code === 'auth/invalid-credential') {
-                setError('Correo o contraseña incorrectos');
+                setError('Correo o contraseña incorrectos. Verifica el correo exacto y la contraseña inicial.');
             } else if (err.code === 'auth/too-many-requests') {
                 setError('Demasiados intentos fallidos. Intente más tarde.');
             } else {
@@ -32,6 +36,29 @@ export default function LoginPage() {
             }
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handlePasswordReset = async () => {
+        setError('');
+        setInfo('');
+        if (!email.trim()) {
+            setError('Escribe tu correo para enviarte el enlace de restablecimiento.');
+            return;
+        }
+
+        setResetLoading(true);
+        try {
+            await sendPasswordResetEmail(auth, email.trim());
+            setInfo('Si el correo está registrado, recibirás un enlace para restablecer tu contraseña.');
+        } catch (err: any) {
+            if (err.code === 'auth/invalid-email') {
+                setError('El correo no tiene un formato válido.');
+            } else {
+                setError('No se pudo enviar el correo de restablecimiento. Intenta nuevamente.');
+            }
+        } finally {
+            setResetLoading(false);
         }
     };
 
@@ -58,6 +85,12 @@ export default function LoginPage() {
                         </div>
                     )}
 
+                    {info && (
+                        <div className="mb-6 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-200">
+                            {info}
+                        </div>
+                    )}
+
                     <form onSubmit={handleLogin} className="space-y-4">
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-slate-300 ml-1">Correo Electrónico</label>
@@ -65,6 +98,8 @@ export default function LoginPage() {
                                 <Mail className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
                                 <input
                                     type="email"
+                                    name="email"
+                                    autoComplete="username"
                                     required
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
@@ -79,13 +114,23 @@ export default function LoginPage() {
                             <div className="relative">
                                 <Key className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
                                 <input
-                                    type="password"
+                                    type={showPassword ? 'text' : 'password'}
+                                    name="password"
+                                    autoComplete="current-password"
                                     required
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     className="w-full bg-slate-900/50 border border-slate-700 text-white px-12 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all placeholder:text-slate-600"
                                     placeholder="••••••••"
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword((valor) => !valor)}
+                                    className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-200"
+                                    aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                                >
+                                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                </button>
                             </div>
                         </div>
 
@@ -101,6 +146,15 @@ export default function LoginPage() {
                             )}
                         </button>
                     </form>
+
+                    <button
+                        type="button"
+                        onClick={() => void handlePasswordReset()}
+                        disabled={resetLoading}
+                        className="mt-4 w-full text-center text-sm font-medium text-slate-400 transition-colors hover:text-slate-200 disabled:opacity-50"
+                    >
+                        {resetLoading ? 'Enviando enlace...' : '¿Olvidaste tu contraseña?'}
+                    </button>
 
                 </div>
             </div>

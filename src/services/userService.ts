@@ -16,6 +16,7 @@ import { initializeApp, deleteApp, getApp } from 'firebase/app';
 import {
     getAuth,
     createUserWithEmailAndPassword,
+    deleteUser,
     sendPasswordResetEmail,
     signOut,
 } from 'firebase/auth';
@@ -165,17 +166,23 @@ export const userService = {
         }
 
         const secondaryAuth = getAuth(secondaryApp);
+        const emailLimpio = email.trim();
+        let newUser: Awaited<ReturnType<typeof createUserWithEmailAndPassword>>['user'] | null = null;
 
         try {
             // 2. Crear usuario en Auth
-            const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
-            const newUser = userCredential.user;
+            const userCredential = await createUserWithEmailAndPassword(
+                secondaryAuth,
+                emailLimpio,
+                password
+            );
+            newUser = userCredential.user;
 
             // 3. Crear perfil en Firestore
             // IMPORTANTE: Escribir en base de datos PRINCIPAL (db importado)
             await this.createUserProfile(newUser.uid, {
                 ...datosPerfil,
-                email,
+                email: emailLimpio,
                 role,
                 uid: newUser.uid
             });
@@ -184,6 +191,13 @@ export const userService = {
             await signOut(secondaryAuth);
 
         } catch (error) {
+            // Si Auth se creó pero el perfil falló, no dejamos una cuenta
+            // huérfana que después no permite ingresar ni volver a crearla.
+            if (newUser) {
+                await deleteUser(newUser).catch((rollbackError) => {
+                    console.error('No se pudo revertir la cuenta Auth huérfana:', rollbackError);
+                });
+            }
             console.error("Error creando supervisor:", error);
             throw error;
         } finally {
